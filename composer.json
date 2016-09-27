@@ -15,7 +15,7 @@
         }
     },
     "require": {
-		"codeit/base": "^0.2.0",
+		"codeit/base": "^0.3.0",
         "zendframework/zend-mvc": "^3.0",
         "zendframework/zend-mvc": "^3.0",
         "zendframework/zend-router": "^3.0",
