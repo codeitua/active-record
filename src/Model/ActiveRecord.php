@@ -115,6 +115,8 @@ class ActiveRecord {
 			return true;
 		} elseif (isset($this->_related[$param])) {
 			return true;
+		} elseif (method_exists($this, 'get' . ucfirst($param)) && $this->__get($param)) {
+			return true;
 		} else {
 			return false;
 		}
@@ -193,11 +195,22 @@ class ActiveRecord {
 	 * @return ArrayObject
 	 */
 	public static function get($id) {
-		if (!$result = static::cacheProvider()->get('record.' . static::tableName() . '.' . $id)) {
-			$result = static::tableGateway()->select([static::primaryKey() => $id])->current();
-			static::cacheProvider()->set('record.' . static::tableName() . '.' . $id, $result);
+		try {
+			if (!$result = static::cacheProvider()->get('record.' . static::tableName() . '.' . $id)) {
+				$result = static::tableGateway()->select([static::primaryKey() => $id])->current();
+				static::cacheProvider()->set('record.' . static::tableName() . '.' . $id, $result);
+			}
+			return $result;
+		} catch (\Exception $e) {
+			if (DEBUG) {
+				$previousMessage = '';
+				if ($e->getPrevious()) {
+					$previousMessage = ': ' . $e->getPrevious()->getMessage();
+				}
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
+					SQL Query was:<br><br>\n\n" . static::tableGateway()->getSqlString(static::adapter()->platform));
+			}
 		}
-		return $result;
 	}
 
 	/**
@@ -259,17 +272,29 @@ class ActiveRecord {
 	 * Saves current state of object
 	 */
 	public function save() {
-		if (!empty($this->{static::primaryKey()})) {
-			static::tableGateway()->update($this->extract(), static::primaryKey() . ' = ' . $this->{static::primaryKey()});
-		} else {
-			if (static::tableGateway()->insert($this->extract(array_diff(static::structure(), [static::primaryKey()])))) {
-				$this->{static::primaryKey()} = static::tableGateway()->getLastInsertValue();
+		try {
+			if (!empty($this->{static::primaryKey()})) {
+				static::tableGateway()->update($this->extract(), static::primaryKey() . ' = ' . $this->{static::primaryKey()});
+			} else {
+				if (static::tableGateway()->insert($this->extract(array_diff(static::structure(), [static::primaryKey()])))) {
+					$this->{static::primaryKey()} = static::tableGateway()->getLastInsertValue();
+				}
+				$this->clearRelationCache();
 			}
-			$this->clearRelationCache();
+			$this->clearCache();
+			$this->runPending();
+			static::get($this->{static::primaryKey()});
+		} catch (\Exception $e) {
+			if (DEBUG) {
+				$previousMessage = '';
+				if ($e->getPrevious()) {
+					$previousMessage = ': ' . $e->getPrevious()->getMessage();
+				}
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
+					SQL Query was:<br><br>\n\n" . $sql->getSqlString($this->adapter->platform));
+				//\Zend\Debug::dump($e);
+			}
 		}
-		$this->clearCache();
-		$this->runPending();
-		static::get($this->{static::primaryKey()});
 	}
 
 	/**
@@ -417,9 +442,21 @@ class ActiveRecord {
 	 * Deletes record from database
 	 */
 	public function delete() {
-		static::tableGateway()->delete([static::primaryKey() => $this->{static::primaryKey()}]);
-		$this->clearCache();
-		$this->clearRelationCache();
+		try {
+			static::tableGateway()->delete([static::primaryKey() => $this->{static::primaryKey()}]);
+			$this->clearCache();
+			$this->clearRelationCache();
+		} catch (\Exception $e) {
+			if (DEBUG) {
+				$previousMessage = '';
+				if ($e->getPrevious()) {
+					$previousMessage = ': ' . $e->getPrevious()->getMessage();
+				}
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
+					SQL Query was:<br><br>\n\n" . $sql->getSqlString($this->adapter->platform));
+				//\Zend\Debug::dump($e);
+			}
+		}
 	}
 
 	/**
@@ -456,7 +493,7 @@ class ActiveRecord {
 	 */
 	public function runPending() {
 		foreach ($this->pendingData as $pending) {
-			call_user_method_array($pending['method'], $this, $pending['attributes']);
+			call_user_func_array([$this, $pending['method']], $pending['attributes']);
 		}
 		$this->pendingData = [];
 	}
@@ -501,7 +538,8 @@ class ActiveRecord {
 			if (!is_array($dataItem)) {
 				$dataItem = (array) $dataItem;
 			}
-			$itemId = ((isset($dataItem[$className::primaryKey()]) && (int)$dataItem[$className::primaryKey()] > 0)?$dataItem[$className::primaryKey()]:0);
+			$dataItem[$linkedTableField] = $this->{$currentTableField};
+			$itemId = ((isset($dataItem[$className::primaryKey()]) && (int) $dataItem[$className::primaryKey()] > 0) ? $dataItem[$className::primaryKey()] : 0);
 			if ($itemId > 0 && isset($this->{$param}[$itemId])) {
 				$this->{$param}[$itemId]->setData($dataItem);
 				$this->{$param}[$itemId]->save();
@@ -514,7 +552,7 @@ class ActiveRecord {
 				$this->_related[$param][$newItem->{$className::primaryKey()}] = $newItem;
 			}
 		}
-		if (isset($this->_related[$param])) {
+		if (isset($this->$param)) {
 			$toDeleteIds = array_diff(array_keys($this->_related[$param]), array_column($data, $className::primaryKey()));
 			foreach ($toDeleteIds as $id) {
 				$this->{$param}[$id]->delete();

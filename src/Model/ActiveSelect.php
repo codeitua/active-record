@@ -95,16 +95,28 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 	 * @return array
 	 */
 	public function getList() {
-		$sql = new \Zend\Db\Sql\Sql(static::adapter());
-		$className = $this->className;
-		$this->columns([$className::primaryKey()]);
-		$request = $sql->prepareStatementForSqlObject($this)->execute();
-		$resultIds = [];
-		while ($row = $request->next()) {
-			$resultIds[] = $row[$className::primaryKey()];
+		try {
+			$sql = new \Zend\Db\Sql\Sql(static::adapter());
+			$className = $this->className;
+			$this->columns([$className::primaryKey()]);
+			$request = $sql->prepareStatementForSqlObject($this)->execute();
+			$resultIds = [];
+			while ($row = $request->next()) {
+				$resultIds[] = $row[$className::primaryKey()];
+			}
+			$result = $this->getListOfRecords($resultIds);
+			return $result;
+		} catch (\Exception $e) {
+			if (DEBUG) {
+				$previousMessage = '';
+				if ($e->getPrevious()) {
+					$previousMessage = ': ' . $e->getPrevious()->getMessage();
+				}
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
+					SQL Query was:<br><br>\n\n" . $sql->getSqlString($this->adapter->platform));
+				//\Zend\Debug::dump($e);
+			}
 		}
-		$result = $this->getListOfRecords($resultIds);
-		return $result;
 	}
 
 	/**
@@ -112,16 +124,28 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 	 * @return boolean|object
 	 */
 	public function getOne() {
-		$sql = new \Zend\Db\Sql\Sql(static::adapter());
-		$className = $this->className;
-		$this->columns([$className::primaryKey()]);
-		$this->limit(1);
-		$request = $sql->prepareStatementForSqlObject($this)->execute();
-		$row = $request->current();
-		if ($result = new $className($row[$className::primaryKey()])) {
-			return $result;
-		} else {
-			return false;
+		try {
+			$sql = new \Zend\Db\Sql\Sql(static::adapter());
+			$className = $this->className;
+			$this->columns([$className::primaryKey()]);
+			$this->limit(1);
+			$request = $sql->prepareStatementForSqlObject($this)->execute();
+			$row = $request->current();
+			if ($result = new $className($row[$className::primaryKey()])) {
+				return $result;
+			} else {
+				return false;
+			}
+		} catch (\Exception $e) {
+			if (DEBUG) {
+				$previousMessage = '';
+				if ($e->getPrevious()) {
+					$previousMessage = ': ' . $e->getPrevious()->getMessage();
+				}
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
+					SQL Query was:<br><br>\n\n" . $sql->getSqlString($this->adapter->platform));
+				//\Zend\Debug::dump($e);
+			}
 		}
 	}
 
@@ -131,27 +155,39 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 	 * @return array
 	 */
 	protected function getListOfRecords($listIds) {
-		$className = $this->className;
-		$requestKeys = [];
-		$tableName = $className::tableName();
-		foreach ($listIds as $id) {
-			$requestKeys[] = 'record.' . $tableName . '.' . $id;
-		}
-		$resultData = static::cacheProvider()->mget($requestKeys);
-		$result = [];
-		if (is_array($resultData) && count($resultData) > 0) {
-			foreach ($resultData as $cacheResult) {
-				if ($cacheResult != false) {
-					$result[$cacheResult[$className::primaryKey()]] = new $className();
-					$result[$cacheResult[$className::primaryKey()]]->setData($cacheResult);
+		try {
+			$className = $this->className;
+			$requestKeys = [];
+			$tableName = $className::tableName();
+			foreach ($listIds as $id) {
+				$requestKeys[] = 'record.' . $tableName . '.' . $id;
+			}
+			$resultData = static::cacheProvider()->mget($requestKeys);
+			$result = [];
+			if (is_array($resultData) && count($resultData) > 0) {
+				foreach ($resultData as $cacheResult) {
+					if ($cacheResult != false) {
+						$result[$cacheResult[$className::primaryKey()]] = new $className();
+						$result[$cacheResult[$className::primaryKey()]]->setData($cacheResult);
+					}
 				}
 			}
+			$stillAbsent = array_diff($listIds, array_keys($result));
+			foreach ($stillAbsent as $id) {
+				$result[$id] = new $className($id);
+			}
+			return $result;
+		} catch (\Exception $e) {
+			if (DEBUG) {
+				$previousMessage = '';
+				if ($e->getPrevious()) {
+					$previousMessage = ': ' . $e->getPrevious()->getMessage();
+				}
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
+					SQL Query was:<br><br>\n\n" . $sql->getSqlString($this->adapter->platform));
+				//\Zend\Debug::dump($e);
+			}
 		}
-		$stillAbsent = array_diff($listIds, array_keys($result));
-		foreach ($stillAbsent as $id) {
-			$result[$id] = new $className($id);
-		}
-		return $result;
 	}
 
 }
