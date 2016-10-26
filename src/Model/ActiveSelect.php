@@ -113,8 +113,7 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 					$previousMessage = ': ' . $e->getPrevious()->getMessage();
 				}
 				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
-					SQL Query was:<br><br>\n\n" . $sql->getSqlString($this->adapter->platform));
-				//\Zend\Debug::dump($e);
+					SQL Query was:<br><br>\n\n" . $this->__toString());
 			}
 		}
 	}
@@ -143,7 +142,26 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 					$previousMessage = ': ' . $e->getPrevious()->getMessage();
 				}
 				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
-					SQL Query was:<br><br>\n\n" . $sql->getSqlString($this->adapter->platform));
+					SQL Query was:<br><br>\n\n" . $this->__toString());
+				//\Zend\Debug::dump($e);
+			}
+		}
+	}
+
+	public function count() {
+		try {
+			$sql = new \Zend\Db\Sql\Sql(static::adapter());
+			$this->columns([$this->className::primaryKey()]);
+			$request = $sql->prepareStatementForSqlObject($this)->execute();
+			return $request->count();
+		} catch (\Exception $e) {
+			if (DEBUG) {
+				$previousMessage = '';
+				if ($e->getPrevious()) {
+					$previousMessage = ': ' . $e->getPrevious()->getMessage();
+				}
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
+					SQL Query was:<br><br>\n\n" . $this->__toString());
 				//\Zend\Debug::dump($e);
 			}
 		}
@@ -184,8 +202,7 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 					$previousMessage = ': ' . $e->getPrevious()->getMessage();
 				}
 				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
-					SQL Query was:<br><br>\n\n" . $sql->getSqlString($this->adapter->platform));
-				//\Zend\Debug::dump($e);
+					SQL Query was:<br><br>\n\n" . $this->__toString());
 			}
 		}
 	}

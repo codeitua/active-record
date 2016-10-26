@@ -47,7 +47,7 @@ class ExistValidator extends AbstractValidator {
 	public function isValid($value) {
 		foreach($this->models as $model) {
 			foreach($this->fields as $field) {
-				if(count($model->query()->where([$field => $value])->getList())) {
+				if(count($model::query()->where([$field => $value])->getList())) {
 					return true;
 				}
 			}

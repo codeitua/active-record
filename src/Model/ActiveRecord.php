@@ -207,8 +207,7 @@ class ActiveRecord {
 				if ($e->getPrevious()) {
 					$previousMessage = ': ' . $e->getPrevious()->getMessage();
 				}
-				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
-					SQL Query was:<br><br>\n\n" . static::tableGateway()->getSqlString(static::adapter()->platform));
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage );
 			}
 		}
 	}
@@ -290,9 +289,7 @@ class ActiveRecord {
 				if ($e->getPrevious()) {
 					$previousMessage = ': ' . $e->getPrevious()->getMessage();
 				}
-				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
-					SQL Query was:<br><br>\n\n" . $sql->getSqlString($this->adapter->platform));
-				//\Zend\Debug::dump($e);
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage );
 			}
 		}
 	}
@@ -452,9 +449,7 @@ class ActiveRecord {
 				if ($e->getPrevious()) {
 					$previousMessage = ': ' . $e->getPrevious()->getMessage();
 				}
-				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
-					SQL Query was:<br><br>\n\n" . $sql->getSqlString($this->adapter->platform));
-				//\Zend\Debug::dump($e);
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage );
 			}
 		}
 	}
@@ -482,7 +477,7 @@ class ActiveRecord {
 	 * @param string $methodName
 	 * @param array $attributes
 	 */
-	public function addPending($methodName, $attributes) {
+	public function addPending($methodName, $attributes = []) {
 		if (method_exists($this, $methodName)) {
 			$this->pendingData[] = ['method' => $methodName, 'attributes' => $attributes];
 		}
@@ -492,7 +487,8 @@ class ActiveRecord {
 	 * Runs mathods from charge
 	 */
 	public function runPending() {
-		foreach ($this->pendingData as $pending) {
+		foreach ($this->pendingData as $key => $pending) {
+			unset($this->pendingData[$key]);
 			call_user_func_array([$this, $pending['method']], $pending['attributes']);
 		}
 		$this->pendingData = [];
