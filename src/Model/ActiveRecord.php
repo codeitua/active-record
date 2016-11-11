@@ -583,4 +583,23 @@ class ActiveRecord {
 		unset($this->_related[$param]);
 	}
 
+	/**
+	 * Extracts array of models
+	 * @param array $listOfModels
+	 * @param type $listOfFields
+	 * @param type $keysAsIndexes
+	 * @return array
+	 */
+	public static function extractList(array $listOfModels, $listOfFields = null, $keysAsIndexes = true){
+		$result = [];
+		foreach($listOfModels as $model) {
+			if($keysAsIndexes){
+				$result[$model->{$model::primaryKey()}] = $model->extract($listOfFields);
+			} else{
+				$result[] = $model->extract($listOfFields);
+			}
+		}
+		return $result;
+	}
+
 }

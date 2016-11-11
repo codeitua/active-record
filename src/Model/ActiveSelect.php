@@ -117,6 +117,32 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 			}
 		}
 	}
+	/**
+	 * Returns array of ids
+	 * @return array
+	 */
+	public function getKeys() {
+		try {
+			$sql = new \Zend\Db\Sql\Sql(static::adapter());
+			$className = $this->className;
+			$this->columns([$className::primaryKey()]);
+			$request = $sql->prepareStatementForSqlObject($this)->execute();
+			$resultIds = [];
+			while ($row = $request->next()) {
+				$resultIds[] = $row[$className::primaryKey()];
+			}
+			return $resultIds;
+		} catch (\Exception $e) {
+			if (DEBUG) {
+				$previousMessage = '';
+				if ($e->getPrevious()) {
+					$previousMessage = ': ' . $e->getPrevious()->getMessage();
+				}
+				throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage . "<br>
+					SQL Query was:<br><br>\n\n" . $this->__toString());
+			}
+		}
+	}
 
 	/**
 	 * Returns one instance
