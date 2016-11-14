@@ -79,7 +79,7 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 			static::cacheProvider()->set($cacheKey, $resultIds);
 		}
 		if ($this->isOne) {
-			if ($result = new $className($resultIds[0])) {
+			if (count($resultIds) > 0 && $result = new $className($resultIds[0])) {
 				return $result;
 			} else {
 				return false;
