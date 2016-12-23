@@ -2,6 +2,11 @@
 
 namespace CodeIT\ActiveRecord\Model;
 
+use Zend\Db\Adapter\Adapter;
+use Zend\Db\TableGateway\TableGateway;
+use CodeIT\Utils\Registry;
+use CodeIT\Cache\Redis;
+
 /**
  * ActiveRecord is the base class for classes representing relational data in terms of objects.
  *
@@ -14,24 +19,24 @@ class ActiveRecord {
 
 	/**
 	 * Cache object
-	 * @var \CodeIT\Cache\Redis
+	 * @var Redis
 	 */
 	protected static $cache;
 
 	/**
 	 * Database adapter
-	 * @var Zend\Db\Adapter\Adapter
+	 * @var Adapter
 	 */
 	protected static $adapter;
 
 	/**
 	 * Zend TableGateways array
-	 * @var Zend\Db\TableGateway\TableGateway[]
+	 * @var TableGateway[]
 	 */
 	protected static $tableGateways;
 
 	/**
-	 * list of pending functions, which will be runned after save
+	 * list of pending functions, which will be ran after save
 	 * @var array
 	 */
 	protected $pendingData = [];
@@ -55,14 +60,14 @@ class ActiveRecord {
 	protected static $structures = [];
 
 	/**
-	 * Current data if property wasn`t declarated
+	 * Current data if property wasn't declared
 	 * @var array 
 	 */
 	protected $_storage = [];
 
 	/**
 	 * Return current table name from class name (first letter changed to small)
-	 * If you want to use Another table name - redeclarate it
+	 * If you want to use Another table name - redeclare it
 	 * @return string
 	 */
 	public static function tableName() {
@@ -88,6 +93,8 @@ class ActiveRecord {
 				return $this->_storage[$param] = $result;
 			}
 		}
+
+		return null;
 	}
 
 	/**
@@ -124,11 +131,11 @@ class ActiveRecord {
 
 	/**
 	 * Returns cache provider
-	 * @return \Application\Lib\Redis
+	 * @return Redis
 	 */
 	public static function cacheProvider() {
 		if (!isset(static::$cache)) {
-			static::$cache = \CodeIT\Utils\Registry::get('sm')->get('cache');
+			static::$cache = Registry::get('sm')->get('cache');
 		}
 		return static::$cache;
 	}
@@ -139,7 +146,7 @@ class ActiveRecord {
 	 */
 	public static function adapter() {
 		if (!isset(static::$adapter)) {
-			static::$adapter = \CodeIT\Utils\Registry::get('sm')->get('dbAdapter');
+			static::$adapter = Registry::get('sm')->get('dbAdapter');
 		}
 		return static::$adapter;
 	}
@@ -150,7 +157,7 @@ class ActiveRecord {
 	 */
 	public static function tableGateway() {
 		if (!isset(static::$tableGateways[static::tableName()])) {
-			static::$tableGateways[static::tableName()] = new \Zend\Db\TableGateway\TableGateway(static::tableName(), static::adapter());
+			static::$tableGateways[static::tableName()] = new TableGateway(static::tableName(), static::adapter());
 		}
 		return static::$tableGateways[static::tableName()];
 	}
@@ -192,7 +199,9 @@ class ActiveRecord {
 	/**
 	 * Returns record from database/cache
 	 * @param int $id
-	 * @return ArrayObject
+	 * @return \ArrayObject
+	 *
+	 * @throws \Exception
 	 */
 	public static function get($id) {
 		try {
@@ -215,14 +224,11 @@ class ActiveRecord {
 	/**
 	 * Constructor
 	 * @param int|null $id
-	 * @return boolean
 	 */
 	public function __construct($id = null) {
 		if (!is_null($id)) {
 			if ($result = static::get($id)) {
 				$this->setData($result);
-			} else {
-				return false;
 			}
 		}
 	}
@@ -249,7 +255,7 @@ class ActiveRecord {
 	}
 
 	/**
-	 * Extract related model for extract metod
+	 * Extract related model for extract method
 	 * @param string $field
 	 * @return mixed
 	 */
@@ -258,6 +264,7 @@ class ActiveRecord {
 			$result = $this->{$field}->extract();
 		} elseif (is_array($this->{$field}) && method_exists(array_values($this->{$field})[0], 'extract')) {
 			$result = [];
+			/* @var $value ActiveRecord */
 			foreach ($this->{$field} as $key => $value) {
 				$result[$key] = $value->extract();
 			}
@@ -337,9 +344,9 @@ class ActiveRecord {
 	 * the attributes of the record associated with the `$class` model, while the values of the
 	 * array refer to the corresponding attributes in returned class.
 	 * @param string|null $relationTableName name of the junction table
-	 * @param type $linkByTable array keys of array points on fields where stored links to 
+	 * @param array $linkByTable array keys of array points on fields where stored links to
 	 * current class table and values to links on needed table
-	 * @return \Application\Lib\ActiveSelect
+	 * @return ActiveSelect
 	 */
 	public function hasMany($className, $link, $relationTableName = null, $linkByTable = null) {
 		return $this->buildRelatedSelect($className, $link, false, $relationTableName, $linkByTable);
@@ -374,9 +381,9 @@ class ActiveRecord {
 	 * the attributes of the record associated with the `$class` model, while the values of the
 	 * array refer to the corresponding attributes in returned class.
 	 * @param string|null $relationTableName name of the junction table
-	 * @param type $linkByTable array keys of array points on fields where stored links to 
+	 * @param array $linkByTable array keys of array points on fields where stored links to
 	 * current class table and values to links on needed table
-	 * @return \Application\Lib\ActiveSelect
+	 * @return ActiveSelect
 	 */
 	public function hasOne($className, $link, $relationTableName = null, $linkByTable = null) {
 		return $this->buildRelatedSelect($className, $link, true, $relationTableName, $linkByTable);
@@ -391,13 +398,15 @@ class ActiveRecord {
 	 * array refer to the corresponding attributes in returned class.
 	 * @param boolean $isOne if set true return object instead of array of objects
 	 * @param string|null $relationTableName name of the junction table
-	 * @param type $linkByTable array keys of array points on fields where stored links to 
+	 * @param array $linkByTable array keys of array points on fields where stored links to
 	 * current class table and values to links on needed table
 	 * @return ActiveSelect
 	 */
 	protected function buildRelatedSelect($className, $link, $isOne, $relationTableName = null, $linkByTable = null) {
+		/* @var $className ActiveRecord */
 		if (!is_null($relationTableName) && is_array($linkByTable)) {
 			$select = new ActiveSelect($className, [$className::tableName() => $relationTableName]);
+			$where = [];
 			foreach ($linkByTable as $currentTableKeyInRelationTable => $linkedTableKeyInRelationTable) {
 				foreach ($link as $currentTableKey => $linkedTableKey) {
 					$where[$currentTableKeyInRelationTable] = $this->{$currentTableKey};
@@ -484,7 +493,7 @@ class ActiveRecord {
 	}
 
 	/**
-	 * Runs mathods from charge
+	 * Runs methods from charge
 	 */
 	public function runPending() {
 		foreach ($this->pendingData as $key => $pending) {
@@ -497,7 +506,7 @@ class ActiveRecord {
 	/**
 	 * Setter for "has many" relation 
 	 * runs methods hasManySetterWithoutRelation or hasManySetterWithRelation
-	 * if object hasn`t id setter stands in chrge to execution after save
+	 * if object hasn't id setter stands in charge to execution after save
 	 * 
 	 * @param string $className
 	 * @param array $link
@@ -507,6 +516,7 @@ class ActiveRecord {
 	 * @param array $linkByTable
 	 */
 	public function hasManySetter($className, $link, array $data, $param, $relationTableName = null, $linkByTable = null) {
+		/* @var $className ActiveRecord */
 		if (!$this->{static::primaryKey()} > 0) {
 			$this->addPending('hasManySetter', func_get_args());
 			return;
@@ -528,6 +538,7 @@ class ActiveRecord {
 	 * @param string $param
 	 */
 	protected function hasManySetterWithoutRelation($className, $link, array $data, $param) {
+		/* @var $className ActiveRecord */
 		$currentTableField = array_keys($link)[0];
 		$linkedTableField = $link[$currentTableField];
 		foreach ($data as $key => $dataItem) {
@@ -571,7 +582,7 @@ class ActiveRecord {
 		$linkedTableField = $link[$currentTableField];
 		$currentTableFieldInRelation = array_keys($linkByTable)[0];
 		$linkedTableFieldInRelation = $linkByTable[$currentTableFieldInRelation];
-		$tableGateway = new \Zend\Db\TableGateway\TableGateway($relationTableName, static::adapter());
+		$tableGateway = new TableGateway($relationTableName, static::adapter());
 		$newPositions = array_diff(array_column($data, $linkedTableField), array_keys($this->{$param}));
 		foreach ($newPositions as $position) {
 			$tableGateway->insert([$currentTableFieldInRelation => $this->{static::primaryKey()}, $linkedTableFieldInRelation => $position]);
@@ -586,8 +597,8 @@ class ActiveRecord {
 	/**
 	 * Extracts array of models
 	 * @param array $listOfModels
-	 * @param type $listOfFields
-	 * @param type $keysAsIndexes
+	 * @param array|null $listOfFields
+	 * @param bool $keysAsIndexes
 	 * @return array
 	 */
 	public static function extractList(array $listOfModels, $listOfFields = null, $keysAsIndexes = true){

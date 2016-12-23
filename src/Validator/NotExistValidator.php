@@ -4,7 +4,7 @@ namespace CodeIT\ActiveRecord\Validator;
 
 use CodeIT\ActiveRecord\Model\ActiveRecord;
 use Zend\Validator\AbstractValidator;
-use Zend\Db\Sql\Expression;
+use Zend\Db\Sql\Where;
 
 class NotExistValidator extends AbstractValidator{
 
@@ -14,15 +14,15 @@ class NotExistValidator extends AbstractValidator{
 
 	const EXIST = 'aexist';
 
-	protected $messageTemplates = array(
+	protected $messageTemplates = [
 		self::EXIST => 'aexist',
-	);
+	];
 
 	/**
-	 * @param string ActiveRecord Class Name
+	 * @param string $model ActiveRecord Class Name
 	 * @param string|[] $field
-	 * @param int $key
-	 * @param int $message
+	 * @param int|bool $key
+	 * @param string $message
 	 */
 	public function __construct($model, $field, $key = false, $message = 'Item with the same value already exists'){
 		parent::__construct();
@@ -36,15 +36,19 @@ class NotExistValidator extends AbstractValidator{
 	}
 
 	public function isValid($value){
-		$where = new \Zend\Db\Sql\Where();
+		/* @var $className ActiveRecord */
+		$className = $this->model;
+		$where = new Where();
 		$where->equalTo($this->field, $value);
-		if(!empty($this->key)){
-			$where->notEqualTo($this->model::primaryKey(), $this->key);
+
+		if (!empty($this->key)) {
+			$where->notEqualTo($className::primaryKey(), $this->key);
 		}
-		if($this->model::query()->where($where)->getList()){
+
+		if ($className::query()->where($where)->getList()) {
 			$this->error(self::EXIST);
 			return false;
-		}else{
+		} else {
 			return true;
 		}
 	}

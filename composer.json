@@ -15,8 +15,7 @@
         }
     },
     "require": {
-		"codeit/base": "^0.3.0",
-        "zendframework/zend-mvc": "^3.0",
+        "codeit/base": "^0.3.0",
         "zendframework/zend-mvc": "^3.0",
         "zendframework/zend-router": "^3.0",
         "zendframework/zend-db": "^2.8",
@@ -29,6 +28,12 @@
         "zendframework/zend-session": "^2.7",
         "zendframework/zend-i18n": "^2.7",
         "zendframework/zend-mvc-console": "^1.1"
-    }
+    },
+    "repositories" : [
+        {
+            "type" : "vcs",
+            "url" : "https://gitlab.codeit.com.ua/Gerasimov/codeit.git"
+        }
+    ]
 }
 

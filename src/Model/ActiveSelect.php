@@ -2,7 +2,13 @@
 
 namespace CodeIT\ActiveRecord\Model;
 
-class ActiveSelect extends \Zend\Db\Sql\Select {
+use Zend\Db\Adapter\Adapter;
+use CodeIT\Cache\Redis;
+use Zend\Db\Sql\Sql;
+use Zend\Db\Sql\Select;
+use CodeIT\Utils\Registry;
+
+class ActiveSelect extends Select {
 
 	/**
 	 * Name of Class which will be returned
@@ -18,34 +24,34 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 
 	/**
 	 * Database adapter
-	 * @var Zend\Db\Adapter\Adapter
+	 * @var Adapter
 	 */
 	protected static $adapter;
 
 	/**
 	 * Cache object
-	 * @var Application\Lib\Redis
+	 * @var Redis
 	 */
 	protected static $cache;
 
 	/**
 	 * Returns cache provider
-	 * @return \Application\Lib\Redis
+	 * @return Redis
 	 */
 	public static function cacheProvider() {
 		if (!isset(static::$cache)) {
-			static::$cache = \CodeIT\Utils\Registry::get('sm')->get('cache');
+			static::$cache = Registry::get('sm')->get('cache');
 		}
 		return static::$cache;
 	}
 
 	/**
 	 * Returns database adapter
-	 * @return \Zend\Db\Adapter\Adapter
+	 * @return Adapter
 	 */
 	public static function adapter() {
 		if (!isset(static::$adapter)) {
-			static::$adapter = \CodeIT\Utils\Registry::get('sm')->get('dbAdapter');
+			static::$adapter = Registry::get('sm')->get('dbAdapter');
 		}
 		return static::$adapter;
 	}
@@ -53,17 +59,25 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 	/**
 	 * Constructor
 	 * @param string $className
+	 * @param string|null $table
 	 */
 	public function __construct($className, $table = null) {
+		/* @var $className ActiveRecord */
 		$this->className = $className;
 		parent::__construct((is_null($table) ? $className::tableName() : $table));
 	}
 
 	/**
 	 * Returns array of instances or one instance. Depends on $isOne property
-	 * @return array|object
+	 *
+	 * @param $parentClass
+	 * @param $id
+	 * @param $paramName
+	 * @return array|object|false
 	 */
 	public function getRelation($parentClass, $id, $paramName) {
+		/* @var $className ActiveRecord */
+		/* @var $parentClass ActiveRecord */
 		$className = $this->className;
 		$cacheKey = 'relation.' . $parentClass::tableName() . '.' . $id . '.' . $paramName . '.' . ($this->isOne ? 'one' : 'many') . '.' . $className::tableName();
 		if (!$resultIds = static::cacheProvider()->get($cacheKey)) {
@@ -71,7 +85,7 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 				$this->limit(1);
 			}
 			$resultIds = [];
-			$sql = new \Zend\Db\Sql\Sql(static::adapter());
+			$sql = new Sql(static::adapter());
 			$request = $sql->prepareStatementForSqlObject($this)->execute();
 			while ($row = $request->next()) {
 				$resultIds[] = $row[$className::primaryKey()];
@@ -93,10 +107,11 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 	/**
 	 * Returns array of instances
 	 * @return array
+	 * @throws \Exception
 	 */
 	public function getList() {
 		try {
-			$sql = new \Zend\Db\Sql\Sql(static::adapter());
+			$sql = new Sql(static::adapter());
 			$className = $this->className;
 			$this->columns([$className::primaryKey()]);
 			$request = $sql->prepareStatementForSqlObject($this)->execute();
@@ -119,11 +134,13 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 	}
 	/**
 	 * Returns array of ids
+	 *
 	 * @return array
+	 * @throws \Exception
 	 */
 	public function getKeys() {
 		try {
-			$sql = new \Zend\Db\Sql\Sql(static::adapter());
+			$sql = new Sql(static::adapter());
 			$className = $this->className;
 			$this->columns([$className::primaryKey()]);
 			$request = $sql->prepareStatementForSqlObject($this)->execute();
@@ -146,11 +163,13 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 
 	/**
 	 * Returns one instance
+	 *
 	 * @return boolean|object
+	 * @throws \Exception
 	 */
 	public function getOne() {
 		try {
-			$sql = new \Zend\Db\Sql\Sql(static::adapter());
+			$sql = new Sql(static::adapter());
 			$className = $this->className;
 			$this->columns([$className::primaryKey()]);
 			$this->limit(1);
@@ -174,9 +193,13 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 		}
 	}
 
+	/**
+	 * @return int
+	 * @throws \Exception
+	 */
 	public function count() {
 		try {
-			$sql = new \Zend\Db\Sql\Sql(static::adapter());
+			$sql = new Sql(static::adapter());
 			$this->columns([$this->className::primaryKey()]);
 			$request = $sql->prepareStatementForSqlObject($this)->execute();
 			return $request->count();
@@ -197,9 +220,11 @@ class ActiveSelect extends \Zend\Db\Sql\Select {
 	 * Return list of instances
 	 * @param array $listIds
 	 * @return array
+	 * @throws \Exception
 	 */
 	protected function getListOfRecords($listIds) {
 		try {
+			/* @var $className ActiveRecord */
 			$className = $this->className;
 			$requestKeys = [];
 			$tableName = $className::tableName();
