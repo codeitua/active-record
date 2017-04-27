@@ -244,8 +244,10 @@ class ActiveRecord {
 			$listOfFields = static::structure();
 		}
 		$result = [];
-		foreach ($listOfFields as $field) {
-			if ($this->{$field} && isset($this->_related[$field])) {
+		foreach ($listOfFields as $key => $field) {
+			if (is_array($field)) {
+				$result[$key] = $this->extractRelated($key, $field);
+            } elseif ($this->{$field} && isset($this->_related[$field])) {
 				$result[$field] = $this->extractRelated($field);
 			} else {
 				$result[$field] = $this->{$field};
@@ -257,16 +259,17 @@ class ActiveRecord {
 	/**
 	 * Extract related model for extract method
 	 * @param string $field
+	 * @param array $listOfFields
 	 * @return mixed
 	 */
-	private function extractRelated($field) {
+	private function extractRelated($field, $listOfFields = null) {
 		if (is_object($this->{$field}) && method_exists($this->{$field}, 'extract')) {
-			$result = $this->{$field}->extract();
+			$result = $this->{$field}->extract($listOfFields);
 		} elseif (is_array($this->{$field}) && method_exists(array_values($this->{$field})[0], 'extract')) {
 			$result = [];
 			/* @var $value ActiveRecord */
 			foreach ($this->{$field} as $key => $value) {
-				$result[$key] = $value->extract();
+				$result[$key] = $value->extract($listOfFields);
 			}
 		} else {
 			$result = $this->{$field};
