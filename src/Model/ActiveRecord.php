@@ -60,6 +60,12 @@ class ActiveRecord
     protected static $structures = [];
 
     /**
+     * Storage where kept all default values from databases
+     * @var array
+     */
+    protected static $default = [];
+
+    /**
      * Current data if property wasn't declared
      * @var array
      */
@@ -182,6 +188,18 @@ class ActiveRecord
     }
 
     /**
+     * returns defaults values
+     * @return array
+     */
+    public static function defaults()
+    {
+        if (!isset(static::$default[static::className()])) {
+            static::structure();
+        }
+        return static::$default[static::className()];
+    }
+
+    /**
      * returns list of fields of current table
      * @return array
      */
@@ -189,16 +207,22 @@ class ActiveRecord
     {
         $className = static::className();
         if (!isset(static::$structures[$className])) {
-            if (!((static::$structures[$className] = static::cacheProvider()->get('structure.'.static::tableName())) && (static::$primaryKeys[$className] = static::cacheProvider()->get('primaryKey.'.static::tableName())))) {
+            if (!(
+                (static::$structures[$className] = static::cacheProvider()->get('structure.'.static::tableName())) &&
+                (static::$default[$className] = static::cacheProvider()->get('default.'.static::tableName())) &&
+                (static::$primaryKeys[$className] = static::cacheProvider()->get('primaryKey.'.static::tableName()))
+                )) {
                 $structureRequest = static::adapter()->query('SHOW COLUMNS FROM `'.static::tableName().'`')->execute();
                 static::$structures[$className] = [];
                 while ($row = $structureRequest->next()) {
                     static::$structures[$className][] = $row['Field'];
+                    static::$default[$className][$row['Field']] = $row['Default'];
                     if ($row['Key'] == 'PRI') {
                         static::$primaryKeys[$className] = $row['Field'];
                     }
                 }
                 static::cacheProvider()->set('structure.'.static::tableName(), static::$structures[$className]);
+                static::cacheProvider()->set('default.'.static::tableName(), static::$default[$className]);
                 static::cacheProvider()->set('primaryKey.'.static::tableName(), static::$primaryKeys[$className]);
             }
         }
@@ -299,7 +323,8 @@ class ActiveRecord
             if (!empty($this->{static::primaryKey()})) {
                 static::tableGateway()->update($this->extract(), static::primaryKey().' = '.$this->{static::primaryKey()});
             } else {
-                if (static::tableGateway()->insert($this->extract(array_diff(static::structure(), [static::primaryKey()])))) {
+                $values = array_replace(static::defaults(), array_diff($this->extract(static::structure()), [null]));
+                if (static::tableGateway()->insert($values)) {
                     $this->{static::primaryKey()} = static::tableGateway()->getLastInsertValue();
                 }
                 $this->clearRelationCache();
