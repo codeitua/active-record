@@ -93,6 +93,8 @@ class ActiveRecord
             return $this->_storage[$param];
         } elseif (isset($this->_related[$param])) {
             return $this->_related[$param];
+        } elseif (method_exists($this, 'relation'.ucfirst($param))) {
+            return $this->_related[$param] = $this->getRelation($this->{'relation'.ucfirst($param)}());
         } elseif (method_exists($this, 'get'.ucfirst($param))) {
             $result = $this->{'get'.ucfirst($param)}();
             if ($result instanceof ActiveSelect) {
@@ -112,7 +114,9 @@ class ActiveRecord
      */
     public function __set($param, $value)
     {
-        if (method_exists($this, 'set'.ucfirst($param))) {
+        if (method_exists($this, 'relation'.ucfirst($param))) {
+            $this->setRealtion($this->{'relation'.ucfirst($param)}(), $value);
+        } elseif (method_exists($this, 'set'.ucfirst($param))) {
             $this->{'set'.ucfirst($param)}($value);
         } elseif (in_array($param, static::structure())) {
             $this->_storage[$param] = $value;
@@ -238,21 +242,22 @@ class ActiveRecord
      */
     public static function get($id)
     {
-        try {
-            if (!$result = static::cacheProvider()->get('record.'.static::tableName().'.'.$id)) {
+        if (!$result = static::cacheProvider()->get('record.'.static::tableName().'.'.$id)) {
+            try {
                 $result = static::tableGateway()->select([static::primaryKey() => $id])->current();
-                static::cacheProvider()->set('record.'.static::tableName().'.'.$id, $result);
-            }
-            return $result;
-        } catch (\Exception $e) {
-            if (DEBUG) {
+            } catch (\Exception $e) {
                 $previousMessage = '';
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
                 throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
+            if (empty($result)) {
+                throw new \Exception($this->className().' '.$id.' not found');
+            }
+            static::cacheProvider()->set('record.'.static::tableName().'.'.$id, $result);
         }
+        return $result;
     }
 
     /**
@@ -333,13 +338,11 @@ class ActiveRecord
             $this->runPending();
             static::get($this->{static::primaryKey()});
         } catch (\Exception $e) {
-            if (DEBUG) {
-                $previousMessage = '';
-                if ($e->getPrevious()) {
-                    $previousMessage = ': '.$e->getPrevious()->getMessage();
-                }
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+            $previousMessage = '';
+            if ($e->getPrevious()) {
+                $previousMessage = ': '.$e->getPrevious()->getMessage();
             }
+            throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
         }
     }
 
@@ -500,15 +503,13 @@ class ActiveRecord
         try {
             static::tableGateway()->delete([static::primaryKey() => $this->{static::primaryKey()}]);
             $this->clearCache();
-            $this->clearRelationCache();
+            $this->clearRelation();
         } catch (\Exception $e) {
-            if (DEBUG) {
-                $previousMessage = '';
-                if ($e->getPrevious()) {
-                    $previousMessage = ': '.$e->getPrevious()->getMessage();
-                }
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+            $previousMessage = '';
+            if ($e->getPrevious()) {
+                $previousMessage = ': '.$e->getPrevious()->getMessage();
             }
+            throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
         }
     }
 
@@ -526,6 +527,12 @@ class ActiveRecord
     public function clearRelation()
     {
         $this->clearRelationCache();
+        foreach(get_class_methods(static::className()) as $method){
+            if(substr($method, 0, 8) === 'relation'){
+                $relation = $this->{$method}();
+                $this->{$relation->paramName}->clearRelationCache();
+            }
+        }
     }
 
     public function clearRelationCache()
@@ -582,6 +589,91 @@ class ActiveRecord
             $this->hasManySetterWithRelation($link, $data, $param, $relationTableName, $linkByTable);
         }
         static::cacheProvider()->deleteCache('relation.'.static::tableName().'.'.$this->{static::primaryKey()}.'.'.$param.'.many.'.$className::tableName());
+    }
+
+    public function hasOneSetter($className, $link, $data, $param, $relationTableName = null, $linkByTable = null)
+    {
+        if (!empty($relationTableName) && !empty($linkByTable)) {
+            $this->hasOneSetterWithRelation($className, $link, $data, $param, $relationTableName, $linkByTable);
+        } else {
+            $this->hasOneSetterWithoutRelation($className, $link, $data, $param);
+        }
+    }
+
+    protected function hasOneSetterWithoutRelation($className, $link, $dataItem, $param)
+    {
+        if (!$this->{static::primaryKey()} > 0) {
+            $this->addPending('hasOneSetter', func_get_args());
+            return;
+        }
+        $currentTableField = array_keys($link)[0];
+        $linkedTableField = $link[$currentTableField];
+        if (!is_array($dataItem)) {
+            $dataItem = (array) $dataItem;
+        }
+        $dataItem[$linkedTableField] = $this->{$currentTableField};
+        $itemId = ((isset($dataItem[$className::primaryKey()]) && (int) $dataItem[$className::primaryKey()] > 0) ? $dataItem[$className::primaryKey()] : 0);
+        if ($itemId > 0 && isset($this->{$param}[$itemId])) {
+            $this->{$param}[$itemId]->setData($dataItem);
+            $this->{$param}[$itemId]->save();
+        } else {
+            $newItem = new $className();
+            unset($dataItem[$className::primaryKey()]);
+            $newItem->setData($dataItem);
+            $newItem->save();
+            $this->_related[$param] = $newItem;
+        }
+    }
+
+    protected function hasOneSetterWithRelation($className, $link, $data, $param, $relationTableName, $linkByTable)
+    {
+        $currentTableField = array_keys($link)[0];
+        $linkedTableField = $link[$currentTableField];
+        $currentTableFieldInRelation = array_keys($linkByTable)[0];
+        $linkedTableFieldInRelation = $linkByTable[$currentTableFieldInRelation];
+        $tableGateway = new TableGateway($relationTableName, static::adapter());
+        $tableGateway->insert([$currentTableFieldInRelation => $this->{static::primaryKey()}, $linkedTableFieldInRelation => $data[$linkedTableField]]);
+        unset($this->_related[$param]);
+    }
+
+    public function relationMany($className, $link, $relationTableName = null, $linkByTable = null)
+    {
+        return $this->relation($className, $link, true, $relationTableName, $linkByTable, lcfirst(substr(debug_backtrace()[1]['function'], 8)));
+    }
+
+    public function relationOne($className, $link, $relationTableName = null, $linkByTable = null)
+    {
+        return $this->relation($className, $link, false, $relationTableName, $linkByTable, lcfirst(substr(debug_backtrace()[1]['function'], 8)));
+    }
+
+    public function relation($className, $link, $hasMany = false, $relationTableName = null, $linkByTable = null, $paramName = null)
+    {
+        $relation = new \stdClass();
+        $relation->className = $className;
+        $relation->link = $link;
+        $relation->hasMany = $hasMany;
+        $relation->relationTableName = $relationTableName;
+        $relation->linkByTable = $linkByTable;
+        $relation->paramName = (!empty($paramName) ? $paramName : lcfirst(substr(debug_backtrace()[1]['function'], 8)));
+        return $relation;
+    }
+
+    /**
+     *
+     * @param \stdClass $relation
+     */
+    protected function getRelation($relation)
+    {
+        return $this->buildRelatedSelect($relation->className, $relation->link, !$relation->hasMany, $relation->relationTableName, $relation->linkByTable);
+    }
+
+    protected function setRelation($relation, $data)
+    {
+        if ($relation->hasMany) {
+            $this->hasManySetter($relation->className, $relation->link, $data, $relation->paramName, $relation->relationTableName, $relation->linkByTable);
+        } else {
+            $this->hasOneSetter($relation->className, $relation->link, $data, $relation->paramName, $relation->relationTableName, $relation->linkByTable);
+        }
     }
 
     /**
