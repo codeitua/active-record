@@ -353,7 +353,9 @@ class ActiveRecord
     public function setData($array)
     {
         foreach ($array as $key => $value) {
-            if (method_exists($this, 'set'.ucfirst($key))) {
+            if (method_exists($this, 'relation'.ucfirst($param))) {
+                $this->setRealtion($this->{'relation'.ucfirst($param)}(), $value);
+            } elseif (method_exists($this, 'set'.ucfirst($key))) {
                 $this->{'set'.ucfirst($key)}($value);
             } elseif (in_array($key, static::structure())) {
                 $this->{$key} = $value;
