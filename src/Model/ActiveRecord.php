@@ -66,6 +66,12 @@ class ActiveRecord
     protected static $default = [];
 
     /**
+     * Storage where kept all types from databases
+     * @var array
+     */
+    protected static $types = [];
+
+    /**
      * Current data if property wasn't declared
      * @var array
      */
@@ -115,7 +121,7 @@ class ActiveRecord
     public function __set($param, $value)
     {
         if (method_exists($this, 'relation'.ucfirst($param))) {
-            $this->setRealtion($this->{'relation'.ucfirst($param)}(), $value);
+            $this->setRelation($this->{'relation'.ucfirst($param)}(), $value);
         } elseif (method_exists($this, 'set'.ucfirst($param))) {
             $this->{'set'.ucfirst($param)}($value);
         } elseif (in_array($param, static::structure())) {
@@ -136,7 +142,7 @@ class ActiveRecord
             return true;
         } elseif (isset($this->_related[$param])) {
             return true;
-        } elseif (method_exists($this, 'get'.ucfirst($param)) && $this->__get($param)) {
+        } elseif ((method_exists($this, 'get'.ucfirst($param)) || method_exists($this, 'relation'.ucfirst($param))) && $this->__get($param)) {
             return true;
         } else {
             return false;
@@ -195,12 +201,30 @@ class ActiveRecord
      * returns defaults values
      * @return array
      */
-    public static function defaults()
+    public static function defaults($param = null)
     {
         if (!isset(static::$default[static::className()])) {
             static::structure();
         }
-        return static::$default[static::className()];
+        if(is_null($param)){
+            return static::$default[static::className()];
+        }
+        if(in_array($param, static::structure())){
+            return static::$default[static::className()][$param];
+        }
+    }
+
+    public static function types($param = null)
+    {
+        if (!isset(static::$types[static::className()])) {
+            static::structure();
+        }
+        if(is_null($param)){
+            return static::$types[static::className()];
+        }
+        if(in_array($param, static::structure())){
+            return static::$types[static::className()][$param];
+        }
     }
 
     /**
@@ -214,6 +238,7 @@ class ActiveRecord
             if (!(
                 (static::$structures[$className] = static::cacheProvider()->get('structure.'.static::tableName())) &&
                 (static::$default[$className] = static::cacheProvider()->get('default.'.static::tableName())) &&
+                (static::$types[$className] = static::cacheProvider()->get('types.'.static::tableName())) &&
                 (static::$primaryKeys[$className] = static::cacheProvider()->get('primaryKey.'.static::tableName()))
                 )) {
                 $structureRequest = static::adapter()->query('SHOW COLUMNS FROM `'.static::tableName().'`')->execute();
@@ -221,12 +246,14 @@ class ActiveRecord
                 while ($row = $structureRequest->next()) {
                     static::$structures[$className][] = $row['Field'];
                     static::$default[$className][$row['Field']] = $row['Default'];
+                    static::$types[$className][$row['Field']] = $row['Type'];
                     if ($row['Key'] == 'PRI') {
                         static::$primaryKeys[$className] = $row['Field'];
                     }
                 }
                 static::cacheProvider()->set('structure.'.static::tableName(), static::$structures[$className]);
                 static::cacheProvider()->set('default.'.static::tableName(), static::$default[$className]);
+                static::cacheProvider()->set('types.'.static::tableName(), static::$types[$className]);
                 static::cacheProvider()->set('primaryKey.'.static::tableName(), static::$primaryKeys[$className]);
             }
         }
@@ -292,6 +319,9 @@ class ActiveRecord
                 $result[$field] = $this->extractRelated($field);
             } else {
                 $result[$field] = $this->{$field};
+                if(static::types($field) === 'tinyint(1)'){
+                    $result[$field] = (boolean) $result[$field];
+                }
             }
         }
         return $result;
@@ -305,9 +335,9 @@ class ActiveRecord
      */
     private function extractRelated($field, $listOfFields = null)
     {
-        if (is_object($this->{$field}) && method_exists($this->{$field}, 'extract')) {
+        if (!empty($this->{$field}) && is_object($this->{$field}) && method_exists($this->{$field}, 'extract')) {
             $result = $this->{$field}->extract($listOfFields);
-        } elseif (is_array($this->{$field}) && method_exists(array_values($this->{$field})[0], 'extract')) {
+        } elseif (is_array($this->{$field})) {
             $result = [];
             /* @var $value ActiveRecord */
             foreach ($this->{$field} as $key => $value) {
@@ -325,10 +355,16 @@ class ActiveRecord
     public function save()
     {
         try {
+            $values = $this->extract();
+            foreach(static::types() as $field => $type){
+                if($type === 'tinyint(1)') {
+                    $values[$field] = (integer) $values[$field];
+                }
+            }
             if (!empty($this->{static::primaryKey()})) {
-                static::tableGateway()->update($this->extract(), static::primaryKey().' = '.$this->{static::primaryKey()});
+                static::tableGateway()->update($values, static::primaryKey().' = '.$this->{static::primaryKey()});
             } else {
-                $values = array_replace(static::defaults(), array_diff($this->extract(static::structure()), [null]));
+                $values = array_replace(static::defaults(), array_diff($values, [null]));
                 if (static::tableGateway()->insert($values)) {
                     $this->{static::primaryKey()} = static::tableGateway()->getLastInsertValue();
                 }
@@ -353,8 +389,8 @@ class ActiveRecord
     public function setData($array)
     {
         foreach ($array as $key => $value) {
-            if (method_exists($this, 'relation'.ucfirst($param))) {
-                $this->setRealtion($this->{'relation'.ucfirst($param)}(), $value);
+            if (method_exists($this, 'relation'.ucfirst($key))) {
+                $this->setRelation($this->{'relation'.ucfirst($key)}(), $value);
             } elseif (method_exists($this, 'set'.ucfirst($key))) {
                 $this->{'set'.ucfirst($key)}($value);
             } elseif (in_array($key, static::structure())) {
@@ -529,12 +565,21 @@ class ActiveRecord
     public function clearRelation()
     {
         $this->clearRelationCache();
-        foreach(get_class_methods(static::className()) as $method){
-            if(substr($method, 0, 8) === 'relation'){
-                $relation = $this->{$method}();
-                $this->{$relation->paramName}->clearRelationCache();
+        foreach($this->listOfRelations() as $param){
+            if(is_object($this->{$param}) && method_exists($this->{$param}, 'clearRelationCache')){
+                $this->{$param}->clearRelationCache();
             }
         }
+    }
+
+    public function listOfRelations(){
+        $result = [];
+        foreach(get_class_methods(static::className()) as $method){
+            if(substr($method, 0, 8) === 'relation' && !in_array($method, ['relationMany', 'relationOne', 'relation'], true)){
+                $result[] = lcfirst(substr($method, 8));
+            }
+        }
+        return $result;
     }
 
     public function clearRelationCache()
@@ -614,10 +659,10 @@ class ActiveRecord
             $dataItem = (array) $dataItem;
         }
         $dataItem[$linkedTableField] = $this->{$currentTableField};
-        $itemId = ((isset($dataItem[$className::primaryKey()]) && (int) $dataItem[$className::primaryKey()] > 0) ? $dataItem[$className::primaryKey()] : 0);
-        if ($itemId > 0 && isset($this->{$param}[$itemId])) {
-            $this->{$param}[$itemId]->setData($dataItem);
-            $this->{$param}[$itemId]->save();
+//        $itemId = ((isset($dataItem[$className::primaryKey()]) && (int) $dataItem[$className::primaryKey()] > 0) ? $dataItem[$className::primaryKey()] : 0);
+        if (isset($this->{$param})) {
+            $this->{$param}->setData($dataItem);
+            $this->{$param}->save();
         } else {
             $newItem = new $className();
             unset($dataItem[$className::primaryKey()]);
@@ -666,7 +711,12 @@ class ActiveRecord
      */
     protected function getRelation($relation)
     {
-        return $this->buildRelatedSelect($relation->className, $relation->link, !$relation->hasMany, $relation->relationTableName, $relation->linkByTable);
+        $activeSelect = $this->buildRelatedSelect($relation->className, $relation->link, !$relation->hasMany, $relation->relationTableName, $relation->linkByTable);
+        if($relation->hasMany){
+            return $activeSelect->getList();
+        } else {
+            return $activeSelect->getOne();
+        }
     }
 
     protected function setRelation($relation, $data)
