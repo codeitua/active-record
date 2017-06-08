@@ -356,19 +356,19 @@ class ActiveRecord
     {
         try {
             $values = $this->extract();
+            if (empty($this->{static::primaryKey()})) {
+                $values = array_replace(static::defaults(), array_diff($values, [null]));
+            }
             foreach(static::types() as $field => $type){
                 if($type === 'tinyint(1)') {
                     $values[$field] = (integer) $values[$field];
                 }
             }
-            if (!empty($this->{static::primaryKey()})) {
-                static::tableGateway()->update($values, static::primaryKey().' = '.$this->{static::primaryKey()});
-            } else {
-                $values = array_replace(static::defaults(), array_diff($values, [null]));
-                if (static::tableGateway()->insert($values)) {
-                    $this->{static::primaryKey()} = static::tableGateway()->getLastInsertValue();
-                }
+            if (empty($this->{static::primaryKey()}) && static::tableGateway()->insert($values)) {
+                $this->{static::primaryKey()} = static::tableGateway()->getLastInsertValue();
                 $this->clearRelationCache();
+            } else {
+                static::tableGateway()->update($values, static::primaryKey().' = '.$this->{static::primaryKey()});
             }
             $this->clearCache();
             $this->runPending();
@@ -649,17 +649,18 @@ class ActiveRecord
 
     protected function hasOneSetterWithoutRelation($className, $link, $dataItem, $param)
     {
-        if (!$this->{static::primaryKey()} > 0) {
+        $currentTableField = array_keys($link)[0];
+        $linkedTableField = $link[$currentTableField];
+        if ($currentTableField === static::primaryKey() && !$this->{static::primaryKey()} > 0) {
             $this->addPending('hasOneSetter', func_get_args());
             return;
         }
-        $currentTableField = array_keys($link)[0];
-        $linkedTableField = $link[$currentTableField];
         if (!is_array($dataItem)) {
             $dataItem = (array) $dataItem;
         }
-        $dataItem[$linkedTableField] = $this->{$currentTableField};
-//        $itemId = ((isset($dataItem[$className::primaryKey()]) && (int) $dataItem[$className::primaryKey()] > 0) ? $dataItem[$className::primaryKey()] : 0);
+        if ($currentTableField === static::primaryKey()){
+            $dataItem[$linkedTableField] = $this->{$currentTableField};
+        }
         if (isset($this->{$param})) {
             $this->{$param}->setData($dataItem);
             $this->{$param}->save();
@@ -669,6 +670,9 @@ class ActiveRecord
             $newItem->setData($dataItem);
             $newItem->save();
             $this->_related[$param] = $newItem;
+        }
+        if ($currentTableField !== static::primaryKey()){
+            $this->{$currentTableField} = $this->_related[$param]->{$linkedTableField};
         }
     }
 
