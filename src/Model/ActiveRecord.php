@@ -280,7 +280,7 @@ class ActiveRecord
                 throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
             if (empty($result)) {
-                throw new \Exception($this->className().' '.$id.' not found');
+                throw new \Exception(self::className().' '.$id.' not found');
             }
             static::cacheProvider()->set('record.'.static::tableName().'.'.$id, $result);
         }
@@ -653,6 +653,10 @@ class ActiveRecord
         $linkedTableField = $link[$currentTableField];
         if ($currentTableField === static::primaryKey() && !$this->{static::primaryKey()} > 0) {
             $this->addPending('hasOneSetter', func_get_args());
+            return;
+        }
+        //@todo: need to remove relation if null
+        if(is_null($dataItem)){
             return;
         }
         if (!is_array($dataItem)) {

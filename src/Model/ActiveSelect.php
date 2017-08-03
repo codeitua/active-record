@@ -118,7 +118,9 @@ class ActiveSelect extends Select
         try {
             $sql = new Sql(static::adapter());
             $className = $this->className;
-            $this->columns([$className::primaryKey()]);
+            if($this->columns === static::SQL_STAR){
+                $this->columns([$className::primaryKey()]);
+            }
             $request = $sql->prepareStatementForSqlObject($this)->execute();
             $resultIds = [];
             while ($row = $request->next()) {
@@ -132,8 +134,7 @@ class ActiveSelect extends Select
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage."<br>
-					SQL Query was:<br><br>\n\n".$this->__toString());
+                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }
     }
@@ -162,8 +163,7 @@ class ActiveSelect extends Select
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage."<br>
-					SQL Query was:<br><br>\n\n".$this->__toString());
+                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }
     }
@@ -194,9 +194,7 @@ class ActiveSelect extends Select
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage."<br>
-					SQL Query was:<br><br>\n\n".$this->__toString());
-                //\Zend\Debug::dump($e);
+                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }
     }
@@ -208,8 +206,9 @@ class ActiveSelect extends Select
     public function count()
     {
         try {
+            $className = $this->className;
             $sql = new Sql(static::adapter());
-            $this->columns([$this->className::primaryKey()]);
+            $this->columns([$className::primaryKey()]);
             $request = $sql->prepareStatementForSqlObject($this)->execute();
             return $request->count();
         } catch (\Exception $e) {
@@ -218,9 +217,7 @@ class ActiveSelect extends Select
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage."<br>
-					SQL Query was:<br><br>\n\n".$this->__toString());
-                //\Zend\Debug::dump($e);
+                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }
     }
@@ -262,8 +259,7 @@ class ActiveSelect extends Select
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage."<br>
-					SQL Query was:<br><br>\n\n".$this->__toString());
+                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }
     }
