@@ -297,6 +297,8 @@ class ActiveRecord
             if ($result = static::get($id)) {
                 $this->setData($result);
             }
+        } else {
+            $this->setData(static::defaults());
         }
     }
 
@@ -356,9 +358,6 @@ class ActiveRecord
     {
         try {
             $values = $this->extract();
-            if (empty($this->{static::primaryKey()})) {
-                $values = array_replace(static::defaults(), array_diff($values, [null]));
-            }
             foreach(static::types() as $field => $type){
                 if($type === 'tinyint(1)') {
                     $values[$field] = (integer) $values[$field];
