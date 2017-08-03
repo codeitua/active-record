@@ -306,9 +306,10 @@ class ActiveRecord
      * Returns data from object by selected fields as array.
      * If $listOfFields == null returns all fields
      * @param array|null $listOfFields
+     * @param bool $keysAsIndexes
      * @return array
      */
-    public function extract($listOfFields = null)
+    public function extract($listOfFields = null, $keysAsIndexes = true)
     {
         if (!is_array($listOfFields)) {
             $listOfFields = static::structure();
@@ -316,9 +317,9 @@ class ActiveRecord
         $result = [];
         foreach ($listOfFields as $key => $field) {
             if (is_array($field)) {
-                $result[$key] = $this->extractRelated($key, $field);
+                $result[$key] = $this->extractRelated($key, $field, $keysAsIndexes);
             } elseif ($this->{$field} && isset($this->_related[$field])) {
-                $result[$field] = $this->extractRelated($field);
+                $result[$field] = $this->extractRelated($field, $keysAsIndexes, $keysAsIndexes);
             } else {
                 $result[$field] = $this->{$field};
                 if(static::types($field) === 'tinyint(1)'){
@@ -333,17 +334,22 @@ class ActiveRecord
      * Extract related model for extract method
      * @param string $field
      * @param array $listOfFields
+     * @param bool $keysAsIndexes
      * @return mixed
      */
-    private function extractRelated($field, $listOfFields = null)
+    private function extractRelated($field, $listOfFields = null, $keysAsIndexes = true)
     {
         if (!empty($this->{$field}) && is_object($this->{$field}) && method_exists($this->{$field}, 'extract')) {
-            $result = $this->{$field}->extract($listOfFields);
+            $result = $this->{$field}->extract($listOfFields, $keysAsIndexes);
         } elseif (is_array($this->{$field})) {
             $result = [];
             /* @var $value ActiveRecord */
             foreach ($this->{$field} as $key => $value) {
-                $result[$key] = $value->extract($listOfFields);
+                if ($keysAsIndexes) {
+                    $result[$key] = $value->extract($listOfFields, $keysAsIndexes);
+                } else {
+                    $result[] = $value->extract($listOfFields, $keysAsIndexes);
+                }
             }
         } else {
             $result = $this->{$field};
@@ -713,8 +719,8 @@ class ActiveRecord
     }
 
     /**
-     *
-     * @param \stdClass $relation
+     * @param $relation
+     * @return array|bool|object
      */
     protected function getRelation($relation)
     {
@@ -816,7 +822,7 @@ class ActiveRecord
             if ($keysAsIndexes) {
                 $result[$model->{$model::primaryKey()}] = $model->extract($listOfFields);
             } else {
-                $result[] = $model->extract($listOfFields);
+                $result[] = $model->extract($listOfFields, $keysAsIndexes);
             }
         }
         return $result;
