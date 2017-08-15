@@ -206,10 +206,10 @@ class ActiveRecord
         if (!isset(static::$default[static::className()])) {
             static::structure();
         }
-        if(is_null($param)){
+        if (is_null($param)) {
             return static::$default[static::className()];
         }
-        if(in_array($param, static::structure())){
+        if (in_array($param, static::structure())) {
             return static::$default[static::className()][$param];
         }
     }
@@ -219,10 +219,10 @@ class ActiveRecord
         if (!isset(static::$types[static::className()])) {
             static::structure();
         }
-        if(is_null($param)){
+        if (is_null($param)) {
             return static::$types[static::className()];
         }
-        if(in_array($param, static::structure())){
+        if (in_array($param, static::structure())) {
             return static::$types[static::className()][$param];
         }
     }
@@ -246,7 +246,7 @@ class ActiveRecord
                 while ($row = $structureRequest->next()) {
                     static::$structures[$className][] = $row['Field'];
                     static::$default[$className][$row['Field']] = $row['Default'];
-                    static::$types[$className][$row['Field']] = $row['Type'];
+                    static::$types[$className][$row['Field']] = static::prepareType($row['Type'], $row['Null']);
                     if ($row['Key'] == 'PRI') {
                         static::$primaryKeys[$className] = $row['Field'];
                     }
@@ -258,6 +258,48 @@ class ActiveRecord
             }
         }
         return static::$structures[$className];
+    }
+
+    private static function prepareType($type, $null)
+    {
+        $result = [];
+        $parsed = preg_match_all("/(.*)\\((.*)\\)(.*)/", $type, $params);
+        $params = array_column($params, 0);
+        if ($parsed) {
+            switch (true) {
+                case ($params[1] === 'tynyint' && $params[2] === '1'):
+                    $result = [
+                        'type' => 'boolean',
+                        'length' => $params[2],
+                    ];
+                    break;
+                case ($params[1] === 'enum' || $params[1] === 'set'):
+                    $variants = explode(',', $params[2]);
+                    $variants = array_map('trim', $variants, array_fill(0, count($variants), "'"));
+                    $result = [
+                        'type' => $params[1],
+                        'length' => count($variants),
+                        'variants' => $variants,
+                    ];
+                    break;
+                default:
+                    $result = [
+                        'type' => $params[1],
+                        'length' => $params[2],
+                    ];
+                    break;
+            }
+            if (!empty($params[3])) {
+                $additionalParams = explode(' ', trim($params[3]));
+                $result['unsigned'] = in_array('unsigned', $additionalParams);
+            }
+        } else {
+            $result = [
+                'type' => $type,
+            ];
+        }
+        $result['null'] = ($null === 'YES');
+        return $result;
     }
 
     /**
@@ -321,7 +363,7 @@ class ActiveRecord
                 $result[$field] = $this->extractRelated($field);
             } else {
                 $result[$field] = $this->{$field};
-                if(static::types($field) === 'tinyint(1)'){
+                if (static::types($field)['type'] === 'boolean') {
                     $result[$field] = (boolean) $result[$field];
                 }
             }
@@ -358,8 +400,8 @@ class ActiveRecord
     {
         try {
             $values = $this->extract();
-            foreach(static::types() as $field => $type){
-                if($type === 'tinyint(1)') {
+            foreach (static::types() as $field => $type) {
+                if ($type === 'boolean') {
                     $values[$field] = (integer) $values[$field];
                 }
             }
@@ -564,17 +606,18 @@ class ActiveRecord
     public function clearRelation()
     {
         $this->clearRelationCache();
-        foreach($this->listOfRelations() as $param){
-            if(is_object($this->{$param}) && method_exists($this->{$param}, 'clearRelationCache')){
+        foreach ($this->listOfRelations() as $param) {
+            if (is_object($this->{$param}) && method_exists($this->{$param}, 'clearRelationCache')) {
                 $this->{$param}->clearRelationCache();
             }
         }
     }
 
-    public function listOfRelations(){
+    public function listOfRelations()
+    {
         $result = [];
-        foreach(get_class_methods(static::className()) as $method){
-            if(substr($method, 0, 8) === 'relation' && !in_array($method, ['relationMany', 'relationOne', 'relation'], true)){
+        foreach (get_class_methods(static::className()) as $method) {
+            if (substr($method, 0, 8) === 'relation' && !in_array($method, ['relationMany', 'relationOne', 'relation'], true)) {
                 $result[] = lcfirst(substr($method, 8));
             }
         }
@@ -655,13 +698,13 @@ class ActiveRecord
             return;
         }
         //@todo: need to remove relation if null
-        if(is_null($dataItem)){
+        if (is_null($dataItem)) {
             return;
         }
         if (!is_array($dataItem)) {
             $dataItem = (array) $dataItem;
         }
-        if ($currentTableField === static::primaryKey()){
+        if ($currentTableField === static::primaryKey()) {
             $dataItem[$linkedTableField] = $this->{$currentTableField};
         }
         if (isset($this->{$param})) {
@@ -674,7 +717,7 @@ class ActiveRecord
             $newItem->save();
             $this->_related[$param] = $newItem;
         }
-        if ($currentTableField !== static::primaryKey()){
+        if ($currentTableField !== static::primaryKey()) {
             $this->{$currentTableField} = $this->_related[$param]->{$linkedTableField};
         }
     }
@@ -719,7 +762,7 @@ class ActiveRecord
     protected function getRelation($relation)
     {
         $activeSelect = $this->buildRelatedSelect($relation->className, $relation->link, !$relation->hasMany, $relation->relationTableName, $relation->linkByTable);
-        if($relation->hasMany){
+        if ($relation->hasMany) {
             return $activeSelect->getList();
         } else {
             return $activeSelect->getOne();
