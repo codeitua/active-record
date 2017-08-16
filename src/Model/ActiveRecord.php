@@ -267,7 +267,7 @@ class ActiveRecord
         $params = array_column($params, 0);
         if ($parsed) {
             switch (true) {
-                case ($params[1] === 'tynyint' && $params[2] === '1'):
+                case ($params[1] === 'tinyint' && $params[2] === '1'):
                     $result = [
                         'type' => 'boolean',
                         'length' => $params[2],
@@ -362,11 +362,10 @@ class ActiveRecord
                 $result[$key] = $this->extractRelated($key, $field, $keysAsIndexes);
             } elseif ($this->{$field} && isset($this->_related[$field])) {
                 $result[$field] = $this->extractRelated($field, $keysAsIndexes, $keysAsIndexes);
+            } elseif (static::types($field)['type'] === 'boolean') {
+                $result[$field] = (boolean) $this->{$field};
             } else {
                 $result[$field] = $this->{$field};
-                if (static::types($field)['type'] === 'boolean') {
-                    $result[$field] = (boolean) $result[$field];
-                }
             }
         }
         return $result;
@@ -407,7 +406,7 @@ class ActiveRecord
         try {
             $values = $this->extract();
             foreach (static::types() as $field => $type) {
-                if ($type === 'boolean') {
+                if ($type['type'] === 'boolean') {
                     $values[$field] = (integer) $values[$field];
                 }
             }
