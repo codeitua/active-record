@@ -118,7 +118,7 @@ class ActiveSelect extends Select
         try {
             $sql = new Sql(static::adapter());
             $className = $this->className;
-            if($this->columns === static::SQL_STAR){
+            if ($this->columns === static::SQL_STAR) {
                 $this->columns([$className::primaryKey()]);
             }
             $request = $sql->prepareStatementForSqlObject($this)->execute();
@@ -127,6 +127,33 @@ class ActiveSelect extends Select
                 $resultIds[] = $row[$className::primaryKey()];
             }
             $result = $this->getListOfRecords($resultIds);
+            return $result;
+        } catch (\Exception $e) {
+            if (DEBUG) {
+                $previousMessage = '';
+                if ($e->getPrevious()) {
+                    $previousMessage = ': '.$e->getPrevious()->getMessage();
+                }
+                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+            }
+        }
+    }
+
+    /**
+     * Returns array of instances
+     * @return array
+     * @throws \Exception
+     */
+    public function getArray()
+    {
+        try {
+            $sql = new Sql(static::adapter());
+            $className = $this->className;
+            $request = $sql->prepareStatementForSqlObject($this)->execute();
+            $result = [];
+            while ($row = $request->next()) {
+                $result[] = $row;
+            }
             return $result;
         } catch (\Exception $e) {
             if (DEBUG) {
@@ -166,6 +193,27 @@ class ActiveSelect extends Select
                 throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }
+    }
+
+    public function joinRelation($relationName)
+    {
+        $className = $this->className;
+        $class = new $className();
+        /* @var $relation Relation */
+        $relation = $class->{'relation'.ucfirst($relationName)}();
+        $relatedClass = $relation->className;
+        if (!empty($relation->linkByTable)) {
+            throw new \ErrorException('Join by link table not implemented yet');
+        } else {
+            $on = [];
+            foreach ($relation->link as $currentTableField => $relatedTableField) {
+                $on[] = sprintf("%s.%s = %s.%s", $class::tableName(), $currentTableField, $relatedClass::tableName(), $relatedTableField);
+            }
+            $on = implode(' AND ', $on);
+        }
+        $this->columns([$class::primaryKey()]);
+        $this->join($relatedClass::tableName(), $on, ['relatedPrimaryKey' => $relatedClass::primaryKey()], static::JOIN_LEFT);
+        return $this;
     }
 
     /**

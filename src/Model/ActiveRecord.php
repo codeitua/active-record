@@ -362,6 +362,13 @@ class ActiveRecord
                 $result[$key] = $this->extractRelated($key, $field, $keysAsIndexes);
             } elseif ($this->{$field} && isset($this->_related[$field])) {
                 $result[$field] = $this->extractRelated($field, $keysAsIndexes, $keysAsIndexes);
+            } elseif (($pos = mb_stripos($field, '.')) > -1) {
+                list($related, $relatedField) = explode('.', $field, 2);
+                if($this->{$related} && isset($this->_related[$related])){
+                    $result[$field] = $this->extractRelated($related, [$relatedField], false)[$relatedField];
+                } else {
+                    return null;
+                }
             } elseif (static::types($field)['type'] === 'boolean') {
                 $result[$field] = (boolean) $this->{$field};
             } else {
@@ -748,15 +755,19 @@ class ActiveRecord
         return $this->relation($className, $link, false, $relationTableName, $linkByTable, lcfirst(substr(debug_backtrace()[1]['function'], 8)));
     }
 
+    /**
+     * Returns relation object
+     * @param type $className
+     * @param type $link
+     * @param type $hasMany
+     * @param type $relationTableName
+     * @param type $linkByTable
+     * @param type $paramName
+     * @return \CodeIT\ActiveRecord\Model\Relation
+     */
     public function relation($className, $link, $hasMany = false, $relationTableName = null, $linkByTable = null, $paramName = null)
     {
-        $relation = new \stdClass();
-        $relation->className = $className;
-        $relation->link = $link;
-        $relation->hasMany = $hasMany;
-        $relation->relationTableName = $relationTableName;
-        $relation->linkByTable = $linkByTable;
-        $relation->paramName = (!empty($paramName) ? $paramName : lcfirst(substr(debug_backtrace()[1]['function'], 8)));
+        $relation = new Relation($className, $link, $hasMany, $relationTableName, $linkByTable, (!empty($paramName) ? $paramName : lcfirst(substr(debug_backtrace()[1]['function'], 8))));
         return $relation;
     }
 
