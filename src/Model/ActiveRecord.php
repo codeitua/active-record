@@ -260,7 +260,7 @@ class ActiveRecord
         return static::$structures[$className];
     }
 
-    private static function prepareType($type, $null)
+    public static function prepareType($type, $null)
     {
         $result = [];
         $parsed = preg_match_all("/(.*)\\((.*)\\)(.*)/", $type, $params);
