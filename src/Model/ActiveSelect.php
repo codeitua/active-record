@@ -231,10 +231,10 @@ class ActiveSelect extends Select
             $this->limit(1);
             $request = $sql->prepareStatementForSqlObject($this)->execute();
             $row = $request->current();
-            if ($result = new $className($row[$className::primaryKey()])) {
+            if ($row && $result = new $className($row[$className::primaryKey()])) {
                 return $result;
             } else {
-                return false;
+                return null;
             }
         } catch (\Exception $e) {
             if (DEBUG) {
