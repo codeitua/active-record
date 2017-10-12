@@ -337,7 +337,7 @@ class ActiveRecord
     {
         if (!is_null($id)) {
             if ($result = static::get($id)) {
-                $this->setData($result);
+                $this->setData(static::mapDataFromSQL($result));
             }
         } else {
             $this->setData(static::defaults());
@@ -364,13 +364,11 @@ class ActiveRecord
                 $result[$field] = $this->extractRelated($field, $keysAsIndexes, $keysAsIndexes);
             } elseif (($pos = mb_stripos($field, '.')) > -1) {
                 list($related, $relatedField) = explode('.', $field, 2);
-                if($this->{$related} && isset($this->_related[$related])){
+                if ($this->{$related} && isset($this->_related[$related])) {
                     $result[$field] = $this->extractRelated($related, [$relatedField], false)[$relatedField];
                 } else {
                     return null;
                 }
-            } elseif (static::types($field)['type'] === 'boolean') {
-                $result[$field] = (boolean) $this->{$field};
             } else {
                 $result[$field] = $this->{$field};
             }
@@ -411,12 +409,7 @@ class ActiveRecord
     public function save()
     {
         try {
-            $values = $this->extract();
-            foreach (static::types() as $field => $type) {
-                if ($type['type'] === 'boolean') {
-                    $values[$field] = (integer) $values[$field];
-                }
-            }
+            $values = static::mapDataToSQL($this->extract());
             if (empty($this->{static::primaryKey()}) && static::tableGateway()->insert($values)) {
                 $this->{static::primaryKey()} = static::tableGateway()->getLastInsertValue();
                 $this->clearRelationCache();
@@ -863,7 +856,7 @@ class ActiveRecord
 
     /**
      * Extracts array of models
-     * @param array $listOfModels
+     * @param ActiveRecord[] $listOfModels
      * @param array|null $listOfFields
      * @param bool $keysAsIndexes
      * @return array
@@ -879,5 +872,33 @@ class ActiveRecord
             }
         }
         return $result;
+    }
+
+    public static function fieldsByType($type)
+    {
+        $fields = array_keys(array_combine(array_keys(static::types()), array_column(static::types(), 'type')), $type);
+        return $fields;
+    }
+
+    public static function mapDataFromSQL($data)
+    {
+        foreach(static::fieldsByType('set') as $field) {
+            $data[$field] = explode(',', $data[$field]);
+        }
+        foreach(static::fieldsByType('boolean') as $field) {
+            $data[$field] = (boolean) $data[$field];
+        }
+        return $data;
+    }
+
+    public static function mapDataToSQL($data)
+    {
+        foreach(static::fieldsByType('set') as $field) {
+            $data[$field] = implode(',', $data[$field]);
+        }
+        foreach(static::fieldsByType('boolean') as $field) {
+            $data[$field] = (integer) $data[$field];
+        }
+        return $data;
     }
 }
