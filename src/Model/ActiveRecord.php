@@ -883,7 +883,7 @@ class ActiveRecord
     public static function mapDataFromSQL($data)
     {
         foreach(static::fieldsByType('set') as $field) {
-            $data[$field] = explode(',', $data[$field]);
+            $data[$field] = array_filter(explode(',', $data[$field]));
         }
         foreach(static::fieldsByType('boolean') as $field) {
             $data[$field] = (boolean) $data[$field];
