@@ -894,7 +894,9 @@ class ActiveRecord
     public static function mapDataToSQL($data)
     {
         foreach(static::fieldsByType('set') as $field) {
-            $data[$field] = implode(',', $data[$field]);
+            if(is_array($data[$field])){
+                $data[$field] = implode(',', $data[$field]);
+            }
         }
         foreach(static::fieldsByType('boolean') as $field) {
             $data[$field] = (integer) $data[$field];
