@@ -134,6 +134,7 @@ class ActiveSelect extends Select
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
+                $previousMessage .= "; SQL Query: ".$sql->buildSqlString($this);
                 throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }
@@ -161,6 +162,7 @@ class ActiveSelect extends Select
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
+                $previousMessage .= "; SQL Query: ".$sql->buildSqlString($this);
                 throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }
@@ -190,6 +192,7 @@ class ActiveSelect extends Select
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
+                $previousMessage .= "; SQL Query: ".$sql->buildSqlString($this);
                 throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }
@@ -242,6 +245,7 @@ class ActiveSelect extends Select
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
+                $previousMessage .= "; SQL Query: ".$sql->buildSqlString($this);
                 throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }
@@ -265,6 +269,7 @@ class ActiveSelect extends Select
                 if ($e->getPrevious()) {
                     $previousMessage = ': '.$e->getPrevious()->getMessage();
                 }
+                $previousMessage .= "; SQL Query: ".$sql->buildSqlString($this);
                 throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
             }
         }

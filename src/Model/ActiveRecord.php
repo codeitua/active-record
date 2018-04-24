@@ -806,6 +806,7 @@ class ActiveRecord
             }
             $dataItem[$linkedTableField] = $this->{$currentTableField};
             $itemId = ((isset($dataItem[$className::primaryKey()]) && (int) $dataItem[$className::primaryKey()] > 0) ? $dataItem[$className::primaryKey()] : 0);
+            $this->{$param};
             if ($itemId > 0 && isset($this->{$param}[$itemId])) {
                 $this->{$param}[$itemId]->setData($dataItem);
                 $this->{$param}[$itemId]->save();
