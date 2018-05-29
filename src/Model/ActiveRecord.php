@@ -414,7 +414,7 @@ class ActiveRecord
                 $this->{static::primaryKey()} = static::tableGateway()->getLastInsertValue();
                 $this->clearRelationCache();
             } else {
-                static::tableGateway()->update($values, static::primaryKey().' = '.$this->{static::primaryKey()});
+                static::tableGateway()->update($values, static::primaryKey().' = \''.$this->{static::primaryKey()} . '\'');
             }
             $this->clearCache();
             $this->runPending();
