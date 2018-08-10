@@ -10,8 +10,9 @@ class Relation
     public $relationTableName;
     public $linkByTable;
     public $paramName;
+    public $order;
 
-    public function __construct($className, $link, $hasMany, $relationTableName, $linkByTable, $paramName)
+    public function __construct($className, $link, $hasMany, $relationTableName, $linkByTable, $paramName, $order)
     {
         $this->className = $className;
         $this->link = $link;
@@ -19,5 +20,6 @@ class Relation
         $this->relationTableName = $relationTableName;
         $this->linkByTable = $linkByTable;
         $this->paramName = $paramName;
+        $this->order = $order;
     }
 }

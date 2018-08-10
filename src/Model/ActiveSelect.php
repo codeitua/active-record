@@ -113,6 +113,11 @@ class ActiveSelect extends Select
      * @return array
      * @throws \Exception
      */
+    public function getSql()
+    {
+        $sql = new Sql(static::adapter());
+        return $sql->buildSqlString($this);
+    }
     public function getList()
     {
         try {

@@ -738,14 +738,14 @@ class ActiveRecord
         unset($this->_related[$param]);
     }
 
-    public function relationMany($className, $link, $relationTableName = null, $linkByTable = null)
+    public function relationMany($className, $link, $relationTableName = null, $linkByTable = null, $order = null)
     {
-        return $this->relation($className, $link, true, $relationTableName, $linkByTable, lcfirst(substr(debug_backtrace()[1]['function'], 8)));
+        return $this->relation($className, $link, true, $relationTableName, $linkByTable, lcfirst(substr(debug_backtrace()[1]['function'], 8)), $order);
     }
 
-    public function relationOne($className, $link, $relationTableName = null, $linkByTable = null)
+    public function relationOne($className, $link, $relationTableName = null, $linkByTable = null, $order = null)
     {
-        return $this->relation($className, $link, false, $relationTableName, $linkByTable, lcfirst(substr(debug_backtrace()[1]['function'], 8)));
+        return $this->relation($className, $link, false, $relationTableName, $linkByTable, lcfirst(substr(debug_backtrace()[1]['function'], 8)), $order);
     }
 
     /**
@@ -758,9 +758,9 @@ class ActiveRecord
      * @param type $paramName
      * @return \CodeIT\ActiveRecord\Model\Relation
      */
-    public function relation($className, $link, $hasMany = false, $relationTableName = null, $linkByTable = null, $paramName = null)
+    public function relation($className, $link, $hasMany = false, $relationTableName = null, $linkByTable = null, $paramName = null, $order = null)
     {
-        $relation = new Relation($className, $link, $hasMany, $relationTableName, $linkByTable, (!empty($paramName) ? $paramName : lcfirst(substr(debug_backtrace()[1]['function'], 8))));
+        $relation = new Relation($className, $link, $hasMany, $relationTableName, $linkByTable, (!empty($paramName) ? $paramName : lcfirst(substr(debug_backtrace()[1]['function'], 8))), $order);
         return $relation;
     }
 
@@ -771,6 +771,9 @@ class ActiveRecord
     protected function getRelation($relation)
     {
         $activeSelect = $this->buildRelatedSelect($relation->className, $relation->link, !$relation->hasMany, $relation->relationTableName, $relation->linkByTable);
+        if(!empty($relation->order)) {
+            $activeSelect->order($relation->order);
+        }
         if ($relation->hasMany) {
             return $activeSelect->getList();
         } else {
