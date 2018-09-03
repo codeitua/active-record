@@ -211,16 +211,23 @@ class ActiveSelect extends Select
         $relation = $class->{'relation'.ucfirst($relationName)}();
         $relatedClass = $relation->className;
         if (!empty($relation->linkByTable)) {
-            throw new \ErrorException('Join by link table not implemented yet');
+            $currentTableLinkField = array_keys($relation->linkByTable)[0];
+            $linkedTableLinkField = array_values($relation->linkByTable)[0];
+            $currentTableField = array_keys($relation->link)[0];
+            $linkedTableField = array_values($relation->link)[0];
+            $joinTableOn = sprintf("%s.%s = %s.%s", $class::tableName(), $currentTableField , $relation->relationTableName, $currentTableLinkField);
+            $this->join($relation->relationTableName, $joinTableOn, static::SQL_STAR, static::JOIN_LEFT);
+            $on = sprintf("%s.%s = %s.%s", $relation->relationTableName, $linkedTableLinkField , $relation->className::tableName(), $linkedTableField);
+            $this->join($relation->className::tableName(), $on, $relation->className::primaryKey(), static::JOIN_LEFT);
         } else {
             $on = [];
             foreach ($relation->link as $currentTableField => $relatedTableField) {
                 $on[] = sprintf("%s.%s = %s.%s", $class::tableName(), $currentTableField, $relatedClass::tableName(), $relatedTableField);
             }
             $on = implode(' AND ', $on);
+            $this->join($relatedClass::tableName(), $on, ['relatedPrimaryKey' => $relatedClass::primaryKey()], static::JOIN_LEFT);
         }
         $this->columns([$class::primaryKey()]);
-        $this->join($relatedClass::tableName(), $on, ['relatedPrimaryKey' => $relatedClass::primaryKey()], static::JOIN_LEFT);
         return $this;
     }
 
