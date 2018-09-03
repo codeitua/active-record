@@ -30,7 +30,7 @@ class Cache
                 $structureRequest = $adapter->query('SHOW COLUMNS FROM `'.$table.'`')->execute();
                 while ($row = $structureRequest->next()) {
                     $realStructure[] = $row['Field'];
-                    $realDefault[] = $row['Default'];
+                    $realDefault[$row['Field']] = $row['Default'];
                     $realTypes[$row['Field']] = \CodeIT\ActiveRecord\Model\ActiveRecord::prepareType($row['Type'], $row['Null']);
                     if ($row['Key'] === 'PRI') {
                         $realPrimary = $row['Field'];
