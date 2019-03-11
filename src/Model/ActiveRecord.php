@@ -411,10 +411,10 @@ class ActiveRecord
         try {
             $values = static::mapDataToSQL($this->extract());
             if (empty($this->{static::primaryKey()}) && static::tableGateway()->insert($values)) {
-                $this->{static::primaryKey()} = static::tableGateway()->getLastInsertValue();
+                $this->setData(static::mapDataFromSQL([static::primaryKey() => static::tableGateway()->getLastInsertValue()]));
                 $this->clearRelationCache();
             } else {
-                static::tableGateway()->update($values, static::primaryKey().' = \''.$this->{static::primaryKey()} . '\'');
+                static::tableGateway()->update($values, static::primaryKey().' = \''.$this->{static::primaryKey()}.'\'');
             }
             $this->clearCache();
             $this->runPending();
@@ -887,22 +887,31 @@ class ActiveRecord
     public static function mapDataFromSQL($data)
     {
         foreach(static::fieldsByType('set') as $field) {
+            if(isset($data[$field])) {
             $data[$field] = array_filter(explode(',', $data[$field]));
         }
+        }
         foreach(static::fieldsByType('boolean') as $field) {
+            if(isset($data[$field])) {
             $data[$field] = (boolean) $data[$field];
+        }
+        }
+        foreach(static::fieldsByType('int') as $field) {
+            if(isset($data[$field])) {
+                $data[$field] = (int) $data[$field];
+            }
         }
         return $data;
     }
 
     public static function mapDataToSQL($data)
     {
-        foreach(static::fieldsByType('set') as $field) {
-            if(is_array($data[$field])){
+        foreach (static::fieldsByType('set') as $field) {
+            if (is_array($data[$field])) {
                 $data[$field] = implode(',', $data[$field]);
             }
         }
-        foreach(static::fieldsByType('boolean') as $field) {
+        foreach (static::fieldsByType('boolean') as $field) {
             $data[$field] = (integer) $data[$field];
         }
         return $data;
