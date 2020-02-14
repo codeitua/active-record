@@ -18,6 +18,11 @@ use CodeIT\Cache\Redis;
 class ActiveRecord
 {
     /**
+     * Field name for relation table in ordered relation tables
+     */
+    const ORDERING_FIELD = 'ordering';
+
+    /**
      * Cache object
      * @var Redis
      */
@@ -76,6 +81,12 @@ class ActiveRecord
      * @var array
      */
     protected $_storage = [];
+
+    /**
+     * Registered value for ordered relations
+     * @var int
+     */
+    protected $__ordering = null;
 
     /**
      * Return current table name from class name (first letter changed to small)
@@ -480,7 +491,8 @@ class ActiveRecord
      */
     public function hasMany($className, $link, $relationTableName = null, $linkByTable = null)
     {
-        return $this->buildRelatedSelect($className, $link, false, $relationTableName, $linkByTable);
+        $relation = new Relation($className, $link, true, $relationTableName, $linkByTable, lcfirst(substr(debug_backtrace()[1]['function'], 8)), $order);
+        return $this->buildRelatedSelect($relation);
     }
 
     /**
@@ -516,9 +528,10 @@ class ActiveRecord
      * current class table and values to links on needed table
      * @return ActiveSelect
      */
-    public function hasOne($className, $link, $relationTableName = null, $linkByTable = null)
+    public function hasOne($className, $link, $relationTableName = null, $linkByTable = null, $order = null)
     {
-        return $this->buildRelatedSelect($className, $link, true, $relationTableName, $linkByTable);
+        $relation = new Relation($className, $link, false, $relationTableName, $linkByTable, lcfirst(substr(debug_backtrace()[1]['function'], 8)), $order);
+        return $this->buildRelatedSelect($relation);
     }
 
     /**
@@ -534,29 +547,37 @@ class ActiveRecord
      * current class table and values to links on needed table
      * @return ActiveSelect
      */
-    protected function buildRelatedSelect($className, $link, $isOne, $relationTableName = null, $linkByTable = null)
+    protected function buildRelatedSelect(Relation $relation)
     {
         /* @var $className ActiveRecord */
-        if (!is_null($relationTableName) && is_array($linkByTable)) {
-            $select = new ActiveSelect($className, [$className::tableName() => $relationTableName]);
+        $columns = [];
+        if (!is_null($relation->relationTableName) && is_array($relation->linkByTable)) {
+            $select = new ActiveSelect($relation->className, [$relation->className::tableName() => $relation->relationTableName]);
             $where = [];
-            foreach ($linkByTable as $currentTableKeyInRelationTable => $linkedTableKeyInRelationTable) {
-                foreach ($link as $currentTableKey => $linkedTableKey) {
+            foreach ($relation->linkByTable as $currentTableKeyInRelationTable => $linkedTableKeyInRelationTable) {
+                foreach ($relation->link as $currentTableKey => $linkedTableKey) {
                     $where[$currentTableKeyInRelationTable] = $this->{$currentTableKey};
-                    $select->columns([$linkedTableKey => $linkedTableKeyInRelationTable]);
+                    $columns = [$linkedTableKey => $linkedTableKeyInRelationTable];
                 }
             }
             $select->where($where);
         } else {
-            $select = new ActiveSelect($className);
-            $select->columns([$className::primaryKey()]);
+            $select = new ActiveSelect($relation->className);
+            $columns = [$relation->className::primaryKey()];
             $where = [];
-            foreach ($link as $currentTableKey => $linkedTableKey) {
-                $where[$className::tableName().'.'.$linkedTableKey] = $this->{$currentTableKey};
+            foreach ($relation->link as $currentTableKey => $linkedTableKey) {
+                $where[$relation->className::tableName().'.'.$linkedTableKey] = $this->{$currentTableKey};
             }
             $select->where($where);
         }
-        $select->isOne = $isOne;
+        if ($relation->order === true) {
+            $select->order(static::ORDERING_FIELD.' asc');
+            $columns['__ordering'] = static::ORDERING_FIELD;
+        } elseif (!empty($relation->order)) {
+            $select->order($relation->order);
+        }
+        $select->columns($columns);
+        $select->isOne = !$relation->hasMany;
         return $select;
     }
 
@@ -670,34 +691,34 @@ class ActiveRecord
      * @param string $relationTableName
      * @param array $linkByTable
      */
-    public function hasManySetter($className, $link, array $data, $param, $relationTableName = null, $linkByTable = null)
+    public function hasManySetter(Relation $relation, array $data)
     {
         /* @var $className ActiveRecord */
         if (!$this->{static::primaryKey()} > 0) {
             $this->addPending('hasManySetter', func_get_args());
             return;
         }
-        if (is_null($relationTableName) || is_null($linkByTable)) {
-            $this->hasManySetterWithoutRelation($className, $link, $data, $param);
+        if (is_null($relation->relationTableName) || is_null($relation->linkByTable)) {
+            $this->hasManySetterWithoutRelation($relation, $data);
         } else {
-            $this->hasManySetterWithRelation($link, $data, $param, $relationTableName, $linkByTable);
+            $this->hasManySetterWithRelation($relation, $data);
         }
-        static::cacheProvider()->deleteCache('relation.'.static::tableName().'.'.$this->{static::primaryKey()}.'.'.$param.'.many.'.$className::tableName());
+        static::cacheProvider()->deleteCache('relation.'.static::tableName().'.'.$this->{static::primaryKey()}.'.'.$relation->paramName.'.many.'.$relation->className::tableName());
     }
 
-    public function hasOneSetter($className, $link, $data, $param, $relationTableName = null, $linkByTable = null)
+    public function hasOneSetter(Relation $relation, $data)
     {
-        if (!empty($relationTableName) && !empty($linkByTable)) {
-            $this->hasOneSetterWithRelation($className, $link, $data, $param, $relationTableName, $linkByTable);
+        if (!empty($relation->relationTableName) && !empty($relation->linkByTable)) {
+            $this->hasOneSetterWithRelation($relation, $data);
         } else {
-            $this->hasOneSetterWithoutRelation($className, $link, $data, $param);
+            $this->hasOneSetterWithoutRelation($relation, $data);
         }
     }
 
-    protected function hasOneSetterWithoutRelation($className, $link, $dataItem, $param)
+    protected function hasOneSetterWithoutRelation(Relation $relation, $dataItem)
     {
-        $currentTableField = array_keys($link)[0];
-        $linkedTableField = $link[$currentTableField];
+        $currentTableField = array_keys($relation->link)[0];
+        $linkedTableField = $relation->link[$currentTableField];
         if ($currentTableField === static::primaryKey() && !$this->{static::primaryKey()} > 0) {
             $this->addPending('hasOneSetter', func_get_args());
             return;
@@ -712,30 +733,30 @@ class ActiveRecord
         if ($currentTableField === static::primaryKey()) {
             $dataItem[$linkedTableField] = $this->{$currentTableField};
         }
-        if (isset($this->{$param})) {
-            $this->{$param}->setData($dataItem);
-            $this->{$param}->save();
+        if (isset($this->{$relation->paramName})) {
+            $this->{$relation->paramName}->setData($dataItem);
+            $this->{$relation->paramName}->save();
         } else {
-            $newItem = new $className();
-            unset($dataItem[$className::primaryKey()]);
+            $newItem = new $relation->className();
+            unset($dataItem[$relation->className::primaryKey()]);
             $newItem->setData($dataItem);
             $newItem->save();
-            $this->_related[$param] = $newItem;
+            $this->_related[$relation->paramName] = $newItem;
         }
         if ($currentTableField !== static::primaryKey()) {
-            $this->{$currentTableField} = $this->_related[$param]->{$linkedTableField};
+            $this->{$currentTableField} = $this->_related[$relation->paramName]->{$linkedTableField};
         }
     }
 
-    protected function hasOneSetterWithRelation($className, $link, $data, $param, $relationTableName, $linkByTable)
+    protected function hasOneSetterWithRelation(Relation $relation, $data)
     {
-        $currentTableField = array_keys($link)[0];
-        $linkedTableField = $link[$currentTableField];
-        $currentTableFieldInRelation = array_keys($linkByTable)[0];
-        $linkedTableFieldInRelation = $linkByTable[$currentTableFieldInRelation];
-        $tableGateway = new TableGateway($relationTableName, static::adapter());
+        $currentTableField = array_keys($relation->link)[0];
+        $linkedTableField = $relation->link[$currentTableField];
+        $currentTableFieldInRelation = array_keys($relation->linkByTable)[0];
+        $linkedTableFieldInRelation = $relation->linkByTable[$currentTableFieldInRelation];
+        $tableGateway = new TableGateway($relation->relationTableName, static::adapter());
         $tableGateway->insert([$currentTableFieldInRelation => $this->{static::primaryKey()}, $linkedTableFieldInRelation => $data[$linkedTableField]]);
-        unset($this->_related[$param]);
+        unset($this->_related[$relation->paramName]);
     }
 
     public function relationMany($className, $link, $relationTableName = null, $linkByTable = null, $order = null)
@@ -765,28 +786,26 @@ class ActiveRecord
     }
 
     /**
-     * @param $relation
+     * @param $relation Relation
      * @return array|bool|object
      */
-    protected function getRelation($relation)
+    protected function getRelation(Relation $relation)
     {
-        $activeSelect = $this->buildRelatedSelect($relation->className, $relation->link, !$relation->hasMany, $relation->relationTableName, $relation->linkByTable);
-        if(!empty($relation->order)) {
-            $activeSelect->order($relation->order);
-        }
+        $activeSelect = $this->buildRelatedSelect($relation);
         if ($relation->hasMany) {
-            return $activeSelect->getList();
+            $result = $activeSelect->getList();
         } else {
-            return $activeSelect->getOne();
+            $result = $activeSelect->getOne();
         }
+        return $result;
     }
 
     protected function setRelation($relation, $data)
     {
         if ($relation->hasMany) {
-            $this->hasManySetter($relation->className, $relation->link, $data, $relation->paramName, $relation->relationTableName, $relation->linkByTable);
+            $this->hasManySetter($relation, $data);
         } else {
-            $this->hasOneSetter($relation->className, $relation->link, $data, $relation->paramName, $relation->relationTableName, $relation->linkByTable);
+            $this->hasOneSetter($relation, $data);
         }
     }
 
@@ -798,35 +817,35 @@ class ActiveRecord
      * @param array $data
      * @param string $param
      */
-    protected function hasManySetterWithoutRelation($className, $link, array $data, $param)
+    protected function hasManySetterWithoutRelation(Relation $relation, array $data)
     {
         /* @var $className ActiveRecord */
-        $currentTableField = array_keys($link)[0];
-        $linkedTableField = $link[$currentTableField];
+        $currentTableField = array_keys($relation->link)[0];
+        $linkedTableField = $relation->link[$currentTableField];
         foreach ($data as $key => $dataItem) {
             if (!is_array($dataItem)) {
                 $dataItem = (array) $dataItem;
             }
             $dataItem[$linkedTableField] = $this->{$currentTableField};
-            $itemId = ((isset($dataItem[$className::primaryKey()]) && (int) $dataItem[$className::primaryKey()] > 0) ? $dataItem[$className::primaryKey()] : 0);
-            $this->{$param};
-            if ($itemId > 0 && isset($this->{$param}[$itemId])) {
-                $this->{$param}[$itemId]->setData($dataItem);
-                $this->{$param}[$itemId]->save();
+            $itemId = ((isset($dataItem[$relation->className::primaryKey()]) && (int) $dataItem[$relation->className::primaryKey()] > 0) ? $dataItem[$relation->className::primaryKey()] : 0);
+            $this->{$relation->paramName};
+            if ($itemId > 0 && isset($this->{$relation->paramName}[$itemId])) {
+                $this->{$relation->paramName}[$itemId]->setData($dataItem);
+                $this->{$relation->paramName}[$itemId]->save();
             } else {
-                $newItem = new $className();
-                unset($dataItem[$className::primaryKey()]);
+                $newItem = new $relation->className();
+                unset($dataItem[$relation->className::primaryKey()]);
                 $newItem->setData($dataItem);
                 $newItem->save();
-                $data[$key][$className::primaryKey()] = $newItem->{$className::primaryKey()};
-                $this->_related[$param][$newItem->{$className::primaryKey()}] = $newItem;
+                $data[$key][$relation->className::primaryKey()] = $newItem->{$relation->className::primaryKey()};
+                $this->_related[$relation->paramName][$newItem->{$relation->className::primaryKey()}] = $newItem;
             }
         }
-        if (isset($this->$param)) {
-            $toDeleteIds = array_diff(array_keys($this->_related[$param]), array_column($data, $className::primaryKey()));
+        if (isset($this->{$relation->paramName})) {
+            $toDeleteIds = array_diff(array_keys($this->_related[$relation->paramName]), array_column($data, $relation->className::primaryKey()));
             foreach ($toDeleteIds as $id) {
-                $this->{$param}[$id]->delete();
-                unset($this->_related[$param][$id]);
+                $this->{$relation->paramName}[$id]->delete();
+                unset($this->_related[$relation->paramName][$id]);
             }
         }
     }
@@ -840,22 +859,35 @@ class ActiveRecord
      * @param string $relationTableName
      * @param array $linkByTable
      */
-    protected function hasManySetterWithRelation($link, $data, $param, $relationTableName, $linkByTable)
+    protected function hasManySetterWithRelation(Relation $relation, $data)
     {
-        $currentTableField = array_keys($link)[0];
-        $linkedTableField = $link[$currentTableField];
-        $currentTableFieldInRelation = array_keys($linkByTable)[0];
-        $linkedTableFieldInRelation = $linkByTable[$currentTableFieldInRelation];
-        $tableGateway = new TableGateway($relationTableName, static::adapter());
-        $newPositions = array_diff(array_column($data, $linkedTableField), array_keys($this->{$param}));
-        foreach ($newPositions as $position) {
-            $tableGateway->insert([$currentTableFieldInRelation => $this->{static::primaryKey()}, $linkedTableFieldInRelation => $position]);
+        $currentTableField = array_keys($relation->link)[0];
+        $linkedTableField = $relation->link[$currentTableField];
+        $currentTableFieldInRelation = array_keys($relation->linkByTable)[0];
+        $linkedTableFieldInRelation = $relation->linkByTable[$currentTableFieldInRelation];
+        $tableGateway = new TableGateway($relation->relationTableName, static::adapter());
+        if ($relation->order) {
+            $ordering = array_combine(array_column($data, $linkedTableField), array_column($data, static::ORDERING_FIELD));
         }
-        $idsToDelete = array_diff(array_keys($this->{$param}), array_column($data, $linkedTableField));
+        $newPositions = array_diff(array_column($data, $linkedTableField), array_keys($this->{$relation->paramName}));
+        foreach ($newPositions as $position) {
+            $columns = [$currentTableFieldInRelation => $this->{static::primaryKey()}, $linkedTableFieldInRelation => $position];
+            if($relation->order && isset($ordering[$position])) {
+                $columns[static::ORDERING_FIELD] = $ordering[$position];
+            }
+            $tableGateway->insert($columns);
+        }
+        $idsToDelete = array_diff(array_keys($this->{$relation->paramName}), array_column($data, $linkedTableField));
         if (count($idsToDelete) > 0) {
             $tableGateway->delete('`'.$currentTableFieldInRelation.'` = \''.$this->{static::primaryKey()}.'\' and `'.$linkedTableFieldInRelation.'` in(\''.implode('\',\'', $idsToDelete).'\')');
         }
-        unset($this->_related[$param]);
+        if ($relation->order) {
+            $ordering = array_diff_key($ordering, array_flip($newPositions), array_flip($idsToDelete));
+            foreach($ordering as $itemId => $ordering) {
+                $tableGateway->update([static::ORDERING_FIELD => $ordering], [$currentTableFieldInRelation => $this->{static::primaryKey()}, $linkedTableFieldInRelation => $itemId]);
+            }
+        }
+        unset($this->_related[$relation->paramName]);
     }
 
     /**
@@ -886,18 +918,18 @@ class ActiveRecord
 
     public static function mapDataFromSQL($data)
     {
-        foreach(static::fieldsByType('set') as $field) {
-            if(isset($data[$field])) {
-            $data[$field] = array_filter(explode(',', $data[$field]));
+        foreach (static::fieldsByType('set') as $field) {
+            if (isset($data[$field])) {
+                $data[$field] = array_filter(explode(',', $data[$field]));
+            }
         }
+        foreach (static::fieldsByType('boolean') as $field) {
+            if (isset($data[$field])) {
+                $data[$field] = (boolean) $data[$field];
+            }
         }
-        foreach(static::fieldsByType('boolean') as $field) {
-            if(isset($data[$field])) {
-            $data[$field] = (boolean) $data[$field];
-        }
-        }
-        foreach(static::fieldsByType('int') as $field) {
-            if(isset($data[$field])) {
+        foreach (static::fieldsByType('int') as $field) {
+            if (isset($data[$field])) {
                 $data[$field] = (int) $data[$field];
             }
         }
@@ -915,5 +947,15 @@ class ActiveRecord
             $data[$field] = (integer) $data[$field];
         }
         return $data;
+    }
+
+    public function getOrdering()
+    {
+        return $this->__ordering;
+    }
+
+    public function setOrdering($value)
+    {
+        $this->__ordering = $value;
     }
 }

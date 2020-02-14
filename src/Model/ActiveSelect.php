@@ -128,10 +128,19 @@ class ActiveSelect extends Select
             }
             $request = $sql->prepareStatementForSqlObject($this)->execute();
             $resultIds = [];
+            $ordering = [];
             while ($row = $request->next()) {
                 $resultIds[] = $row[$className::primaryKey()];
+                if(isset($row['__ordering'])) {
+                    $ordering[$row[$className::primaryKey()]] = $row['__ordering'];
+                }
             }
             $result = $this->getListOfRecords($resultIds);
+            if(!empty($ordering)) {
+                foreach($result as $key => $value) {
+                    $result[$key]->setOrdering($ordering[$key]);
+                }
+            }
             return $result;
         } catch (\Exception $e) {
             if (DEBUG) {
