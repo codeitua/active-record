@@ -3,8 +3,8 @@
 namespace CodeIT\ActiveRecord\Validator;
 
 use CodeIT\ActiveRecord\Model\ActiveRecord;
-use Zend\Validator\AbstractValidator;
-use Zend\Db\Sql\Where;
+use Laminas\Validator\AbstractValidator;
+use Laminas\Db\Sql\Where;
 
 class NotExistValidator extends AbstractValidator
 {

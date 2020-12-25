@@ -19,15 +19,15 @@ class Cache
             }
         }
         foreach ($tables as $table) {
-            $cashedStructure = $cache->get('structure.'.$table);
-            $cashedDefault = $cache->get('default.'.$table);
-            $cashedTypes = $cache->get('types.'.$table);
-            $cashedPrimaryKey = $cache->get('primaryKey.'.$table);
+            $cashedStructure = $cache->get('structure.' . $table);
+            $cashedDefault = $cache->get('default.' . $table);
+            $cashedTypes = $cache->get('types.' . $table);
+            $cashedPrimaryKey = $cache->get('primaryKey.' . $table);
             if (!empty($cashedStructure) || !empty($cashedPrimaryKey)) {
                 $realStructure = [];
                 $realTypes = [];
                 $realDefault = [];
-                $structureRequest = $adapter->query('SHOW COLUMNS FROM `'.$table.'`')->execute();
+                $structureRequest = $adapter->query('SHOW COLUMNS FROM `' . $table . '`')->execute();
                 while ($row = $structureRequest->next()) {
                     $realStructure[] = $row['Field'];
                     $realDefault[$row['Field']] = $row['Default'];
@@ -37,7 +37,7 @@ class Cache
                     }
                 }
                 if (count(array_diff($realDefault, $cashedDefault)) > 0 || count(array_diff($cashedDefault, $realDefault)) > 0) {
-                    $cache->set('default.'.$table, $realDefault);
+                    $cache->set('default.' . $table, $realDefault);
                 }
                 if (
                     !is_array($cashedStructure) ||
@@ -49,10 +49,10 @@ class Cache
                     count(static::arrayRecursiveDiff($cashedTypes, $realTypes)) ||
                     $realPrimary !== $cashedPrimaryKey
                 ) {
-                    $cache->set('structure.'.$table, $realStructure);
-                    $cache->set('types.'.$table, $realTypes);
-                    $cache->set('primaryKey.'.$table, $realPrimary);
-                    $cache->deleteByMask('record.'.$table.'.');
+                    $cache->set('structure.' . $table, $realStructure);
+                    $cache->set('types.' . $table, $realTypes);
+                    $cache->set('primaryKey.' . $table, $realPrimary);
+                    $cache->deleteByMask('record.' . $table . '.');
                 }
             }
         }

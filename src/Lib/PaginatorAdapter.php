@@ -2,14 +2,15 @@
 
 namespace CodeIT\ActiveRecord\Lib;
 
-use Zend\Db\Sql\Select;
+use Laminas\Db\Sql\Select;
+
 /**
  * @property \CodeIT\ActiveRecord\Model\ActiveSelect $select
   */
-class PaginatorAdapter extends \Zend\Paginator\Adapter\DbSelect
+class PaginatorAdapter extends \Laminas\Paginator\Adapter\DbSelect
 {
 
-    public function __construct(\Zend\Db\Sql\Select $select, $adapterOrSqlObject, \Zend\Db\ResultSet\ResultSetInterface $resultSetPrototype = null, \Zend\Db\Sql\Select $countSelect = null)
+    public function __construct(\Laminas\Db\Sql\Select $select, $adapterOrSqlObject, \Laminas\Db\ResultSet\ResultSetInterface $resultSetPrototype = null, \Laminas\Db\Sql\Select $countSelect = null)
     {
 
         parent::__construct($select, $adapterOrSqlObject, $resultSetPrototype, $countSelect);
@@ -21,7 +22,7 @@ class PaginatorAdapter extends \Zend\Paginator\Adapter\DbSelect
         $select->offset($offset);
         $select->limit($itemCountPerPage);
         $ds = clone $select;
-        $sql = new \Zend\Db\Sql\Sql($ds::adapter());
+        $sql = new \Laminas\Db\Sql\Sql($ds::adapter());
         return $select->getList();
     }
 
@@ -36,5 +37,4 @@ class PaginatorAdapter extends \Zend\Paginator\Adapter\DbSelect
         }
         return $this->rowCount;
     }
-
 }

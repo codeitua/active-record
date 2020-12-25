@@ -2,7 +2,7 @@
 
 namespace CodeIT\ActiveRecord\Validator;
 
-use Zend\Validator\AbstractValidator;
+use Laminas\Validator\AbstractValidator;
 use CodeIT\ActiveRecord\Model\ActiveRecord;
 
 class ExistValidator extends AbstractValidator

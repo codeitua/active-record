@@ -2,10 +2,10 @@
 
 namespace CodeIT\ActiveRecord\Model;
 
-use Zend\Db\Adapter\Adapter;
+use Laminas\Db\Adapter\Adapter;
 use CodeIT\Cache\Redis;
-use Zend\Db\Sql\Sql;
-use Zend\Db\Sql\Select;
+use Laminas\Db\Sql\Sql;
+use Laminas\Db\Sql\Select;
 use CodeIT\Utils\Registry;
 
 class ActiveSelect extends Select
@@ -83,7 +83,7 @@ class ActiveSelect extends Select
         /* @var $className ActiveRecord */
         /* @var $parentClass ActiveRecord */
         $className = $this->className;
-        $cacheKey = 'relation.'.$parentClass::tableName().'.'.$id.'.'.$paramName.'.'.($this->isOne ? 'one' : 'many').'.'.$className::tableName();
+        $cacheKey = 'relation.' . $parentClass::tableName() . '.' . $id . '.' . $paramName . '.' . ($this->isOne ? 'one' : 'many') . '.' . $className::tableName();
         if (!$resultIds = static::cacheProvider()->get($cacheKey)) {
             if ($this->isOne) {
                 $this->limit(1);
@@ -131,13 +131,13 @@ class ActiveSelect extends Select
             $ordering = [];
             while ($row = $request->next()) {
                 $resultIds[] = $row[$className::primaryKey()];
-                if(isset($row['__ordering'])) {
+                if (isset($row['__ordering'])) {
                     $ordering[$row[$className::primaryKey()]] = $row['__ordering'];
                 }
             }
             $result = $this->getListOfRecords($resultIds);
-            if(!empty($ordering)) {
-                foreach($result as $key => $value) {
+            if (!empty($ordering)) {
+                foreach ($result as $key => $value) {
                     $result[$key]->setOrdering($ordering[$key]);
                 }
             }
@@ -146,10 +146,10 @@ class ActiveSelect extends Select
             if (DEBUG) {
                 $previousMessage = '';
                 if ($e->getPrevious()) {
-                    $previousMessage = ': '.$e->getPrevious()->getMessage();
+                    $previousMessage = ': ' . $e->getPrevious()->getMessage();
                 }
-                $previousMessage .= "; SQL Query: ".$sql->buildSqlString($this);
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+                $previousMessage .= "; SQL Query: " . $sql->buildSqlString($this);
+                throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage);
             }
         }
     }
@@ -174,10 +174,10 @@ class ActiveSelect extends Select
             if (DEBUG) {
                 $previousMessage = '';
                 if ($e->getPrevious()) {
-                    $previousMessage = ': '.$e->getPrevious()->getMessage();
+                    $previousMessage = ': ' . $e->getPrevious()->getMessage();
                 }
-                $previousMessage .= "; SQL Query: ".$sql->buildSqlString($this);
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+                $previousMessage .= "; SQL Query: " . $sql->buildSqlString($this);
+                throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage);
             }
         }
     }
@@ -204,10 +204,10 @@ class ActiveSelect extends Select
             if (DEBUG) {
                 $previousMessage = '';
                 if ($e->getPrevious()) {
-                    $previousMessage = ': '.$e->getPrevious()->getMessage();
+                    $previousMessage = ': ' . $e->getPrevious()->getMessage();
                 }
-                $previousMessage .= "; SQL Query: ".$sql->buildSqlString($this);
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+                $previousMessage .= "; SQL Query: " . $sql->buildSqlString($this);
+                throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage);
             }
         }
     }
@@ -217,16 +217,16 @@ class ActiveSelect extends Select
         $className = $this->className;
         $class = new $className();
         /* @var $relation Relation */
-        $relation = $class->{'relation'.ucfirst($relationName)}();
+        $relation = $class->{'relation' . ucfirst($relationName)}();
         $relatedClass = $relation->className;
         if (!empty($relation->linkByTable)) {
             $currentTableLinkField = array_keys($relation->linkByTable)[0];
             $linkedTableLinkField = array_values($relation->linkByTable)[0];
             $currentTableField = array_keys($relation->link)[0];
             $linkedTableField = array_values($relation->link)[0];
-            $joinTableOn = sprintf("%s.%s = %s.%s", $class::tableName(), $currentTableField , $relation->relationTableName, $currentTableLinkField);
+            $joinTableOn = sprintf("%s.%s = %s.%s", $class::tableName(), $currentTableField, $relation->relationTableName, $currentTableLinkField);
             $this->join($relation->relationTableName, $joinTableOn, static::SQL_STAR, static::JOIN_LEFT);
-            $on = sprintf("%s.%s = %s.%s", $relation->relationTableName, $linkedTableLinkField , $relation->className::tableName(), $linkedTableField);
+            $on = sprintf("%s.%s = %s.%s", $relation->relationTableName, $linkedTableLinkField, $relation->className::tableName(), $linkedTableField);
             $this->join($relation->className::tableName(), $on, $relation->className::primaryKey(), static::JOIN_LEFT);
         } else {
             $on = [];
@@ -264,10 +264,10 @@ class ActiveSelect extends Select
             if (DEBUG) {
                 $previousMessage = '';
                 if ($e->getPrevious()) {
-                    $previousMessage = ': '.$e->getPrevious()->getMessage();
+                    $previousMessage = ': ' . $e->getPrevious()->getMessage();
                 }
-                $previousMessage .= "; SQL Query: ".$sql->buildSqlString($this);
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+                $previousMessage .= "; SQL Query: " . $sql->buildSqlString($this);
+                throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage);
             }
         }
     }
@@ -288,10 +288,10 @@ class ActiveSelect extends Select
             if (DEBUG) {
                 $previousMessage = '';
                 if ($e->getPrevious()) {
-                    $previousMessage = ': '.$e->getPrevious()->getMessage();
+                    $previousMessage = ': ' . $e->getPrevious()->getMessage();
                 }
-                $previousMessage .= "; SQL Query: ".$sql->buildSqlString($this);
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+                $previousMessage .= "; SQL Query: " . $sql->buildSqlString($this);
+                throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage);
             }
         }
     }
@@ -310,7 +310,7 @@ class ActiveSelect extends Select
             $requestKeys = [];
             $tableName = $className::tableName();
             foreach ($listIds as $id) {
-                $requestKeys[] = 'record.'.$tableName.'.'.$id;
+                $requestKeys[] = 'record.' . $tableName . '.' . $id;
             }
             $resultData = static::cacheProvider()->mget($requestKeys);
             $result = [];
@@ -331,9 +331,9 @@ class ActiveSelect extends Select
             if (DEBUG) {
                 $previousMessage = '';
                 if ($e->getPrevious()) {
-                    $previousMessage = ': '.$e->getPrevious()->getMessage();
+                    $previousMessage = ': ' . $e->getPrevious()->getMessage();
                 }
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+                throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage);
             }
         }
     }

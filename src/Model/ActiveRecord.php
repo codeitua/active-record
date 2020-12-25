@@ -2,8 +2,8 @@
 
 namespace CodeIT\ActiveRecord\Model;
 
-use Zend\Db\Adapter\Adapter;
-use Zend\Db\TableGateway\TableGateway;
+use Laminas\Db\Adapter\Adapter;
+use Laminas\Db\TableGateway\TableGateway;
 use CodeIT\Utils\Registry;
 use CodeIT\Cache\Redis;
 
@@ -48,7 +48,7 @@ class ActiveRecord
 
     /**
      * List of related instances
-     * @var array 
+     * @var array
      */
     protected $_related = [];
 
@@ -110,10 +110,10 @@ class ActiveRecord
             return $this->_storage[$param];
         } elseif (isset($this->_related[$param])) {
             return $this->_related[$param];
-        } elseif (method_exists($this, 'relation'.ucfirst($param))) {
-            return $this->_related[$param] = $this->getRelation($this->{'relation'.ucfirst($param)}());
-        } elseif (method_exists($this, 'get'.ucfirst($param))) {
-            $result = $this->{'get'.ucfirst($param)}();
+        } elseif (method_exists($this, 'relation' . ucfirst($param))) {
+            return $this->_related[$param] = $this->getRelation($this->{'relation' . ucfirst($param)}());
+        } elseif (method_exists($this, 'get' . ucfirst($param))) {
+            $result = $this->{'get' . ucfirst($param)}();
             if ($result instanceof ActiveSelect) {
                 return $this->_related[$param] = $result->getRelation(static::className(), $this->{static::primaryKey()}, $param);
             } else {
@@ -131,10 +131,10 @@ class ActiveRecord
      */
     public function __set($param, $value)
     {
-        if (method_exists($this, 'relation'.ucfirst($param))) {
-            $this->setRelation($this->{'relation'.ucfirst($param)}(), $value);
-        } elseif (method_exists($this, 'set'.ucfirst($param))) {
-            $this->{'set'.ucfirst($param)}($value);
+        if (method_exists($this, 'relation' . ucfirst($param))) {
+            $this->setRelation($this->{'relation' . ucfirst($param)}(), $value);
+        } elseif (method_exists($this, 'set' . ucfirst($param))) {
+            $this->{'set' . ucfirst($param)}($value);
         } elseif (in_array($param, static::structure())) {
             $this->_storage[$param] = $value;
         } elseif (isset($this->_related[$param])) {
@@ -153,7 +153,7 @@ class ActiveRecord
             return true;
         } elseif (isset($this->_related[$param])) {
             return true;
-        } elseif ((method_exists($this, 'get'.ucfirst($param)) || method_exists($this, 'relation'.ucfirst($param))) && $this->__get($param)) {
+        } elseif ((method_exists($this, 'get' . ucfirst($param)) || method_exists($this, 'relation' . ucfirst($param))) && $this->__get($param)) {
             return true;
         } else {
             return false;
@@ -174,7 +174,7 @@ class ActiveRecord
 
     /**
      * Returns database adapter
-     * @return \Zend\Db\Adapter\Adapter
+     * @return \Laminas\Db\Adapter\Adapter
      */
     public static function adapter()
     {
@@ -186,7 +186,7 @@ class ActiveRecord
 
     /**
      * returns TableGateway
-     * @return \Zend\Db\TableGateway\TableGateway
+     * @return \Laminas\Db\TableGateway\TableGateway
      */
     public static function tableGateway()
     {
@@ -246,13 +246,15 @@ class ActiveRecord
     {
         $className = static::className();
         if (!isset(static::$structures[$className])) {
-            if (!(
-                (static::$structures[$className] = static::cacheProvider()->get('structure.'.static::tableName())) &&
-                (static::$default[$className] = static::cacheProvider()->get('default.'.static::tableName())) &&
-                (static::$types[$className] = static::cacheProvider()->get('types.'.static::tableName())) &&
-                (static::$primaryKeys[$className] = static::cacheProvider()->get('primaryKey.'.static::tableName()))
-                )) {
-                $structureRequest = static::adapter()->query('SHOW COLUMNS FROM `'.static::tableName().'`')->execute();
+            if (
+                !(
+                (static::$structures[$className] = static::cacheProvider()->get('structure.' . static::tableName())) &&
+                (static::$default[$className] = static::cacheProvider()->get('default.' . static::tableName())) &&
+                (static::$types[$className] = static::cacheProvider()->get('types.' . static::tableName())) &&
+                (static::$primaryKeys[$className] = static::cacheProvider()->get('primaryKey.' . static::tableName()))
+                )
+            ) {
+                $structureRequest = static::adapter()->query('SHOW COLUMNS FROM `' . static::tableName() . '`')->execute();
                 static::$structures[$className] = [];
                 while ($row = $structureRequest->next()) {
                     static::$structures[$className][] = $row['Field'];
@@ -262,10 +264,10 @@ class ActiveRecord
                         static::$primaryKeys[$className] = $row['Field'];
                     }
                 }
-                static::cacheProvider()->set('structure.'.static::tableName(), static::$structures[$className]);
-                static::cacheProvider()->set('default.'.static::tableName(), static::$default[$className]);
-                static::cacheProvider()->set('types.'.static::tableName(), static::$types[$className]);
-                static::cacheProvider()->set('primaryKey.'.static::tableName(), static::$primaryKeys[$className]);
+                static::cacheProvider()->set('structure.' . static::tableName(), static::$structures[$className]);
+                static::cacheProvider()->set('default.' . static::tableName(), static::$default[$className]);
+                static::cacheProvider()->set('types.' . static::tableName(), static::$types[$className]);
+                static::cacheProvider()->set('primaryKey.' . static::tableName(), static::$primaryKeys[$className]);
             }
         }
         return static::$structures[$className];
@@ -322,20 +324,20 @@ class ActiveRecord
      */
     public static function get($id)
     {
-        if (!$result = static::cacheProvider()->get('record.'.static::tableName().'.'.$id)) {
+        if (!$result = static::cacheProvider()->get('record.' . static::tableName() . '.' . $id)) {
             try {
                 $result = static::tableGateway()->select([static::primaryKey() => $id])->current();
             } catch (\Exception $e) {
                 $previousMessage = '';
                 if ($e->getPrevious()) {
-                    $previousMessage = ': '.$e->getPrevious()->getMessage();
+                    $previousMessage = ': ' . $e->getPrevious()->getMessage();
                 }
-                throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+                throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage);
             }
             if (empty($result)) {
-                throw new \Exception(self::className().' '.$id.' not found');
+                throw new \Exception(self::className() . ' ' . $id . ' not found');
             }
-            static::cacheProvider()->set('record.'.static::tableName().'.'.$id, $result);
+            static::cacheProvider()->set('record.' . static::tableName() . '.' . $id, $result);
         }
         return $result;
     }
@@ -425,7 +427,7 @@ class ActiveRecord
                 $this->setData(static::mapDataFromSQL([static::primaryKey() => static::tableGateway()->getLastInsertValue()]));
                 $this->clearRelationCache();
             } else {
-                static::tableGateway()->update($values, static::primaryKey().' = \''.$this->{static::primaryKey()}.'\'');
+                static::tableGateway()->update($values, static::primaryKey() . ' = \'' . $this->{static::primaryKey()} . '\'');
             }
             $this->clearCache();
             $this->runPending();
@@ -433,9 +435,9 @@ class ActiveRecord
         } catch (\Exception $e) {
             $previousMessage = '';
             if ($e->getPrevious()) {
-                $previousMessage = ': '.$e->getPrevious()->getMessage();
+                $previousMessage = ': ' . $e->getPrevious()->getMessage();
             }
-            throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+            throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage);
         }
     }
 
@@ -446,10 +448,10 @@ class ActiveRecord
     public function setData($array)
     {
         foreach ($array as $key => $value) {
-            if (method_exists($this, 'relation'.ucfirst($key))) {
-                $this->setRelation($this->{'relation'.ucfirst($key)}(), $value);
-            } elseif (method_exists($this, 'set'.ucfirst($key))) {
-                $this->{'set'.ucfirst($key)}($value);
+            if (method_exists($this, 'relation' . ucfirst($key))) {
+                $this->setRelation($this->{'relation' . ucfirst($key)}(), $value);
+            } elseif (method_exists($this, 'set' . ucfirst($key))) {
+                $this->{'set' . ucfirst($key)}($value);
             } elseif (in_array($key, static::structure())) {
                 $this->{$key} = $value;
             }
@@ -536,7 +538,7 @@ class ActiveRecord
 
     /**
      * Builds query for ->hasOne and ->hasMany methods
-     * 
+     *
      * @param string $className the class name of the related record
      * @param array $link the primary-foreign key constraint. The keys of the array refer to
      * the attributes of the record associated with the `$class` model, while the values of the
@@ -566,12 +568,12 @@ class ActiveRecord
             $columns = [$relation->className::primaryKey()];
             $where = [];
             foreach ($relation->link as $currentTableKey => $linkedTableKey) {
-                $where[$relation->className::tableName().'.'.$linkedTableKey] = $this->{$currentTableKey};
+                $where[$relation->className::tableName() . '.' . $linkedTableKey] = $this->{$currentTableKey};
             }
             $select->where($where);
         }
         if ($relation->order === true) {
-            $select->order(static::ORDERING_FIELD.' asc');
+            $select->order(static::ORDERING_FIELD . ' asc');
             $columns['__ordering'] = static::ORDERING_FIELD;
         } elseif (!empty($relation->order)) {
             $select->order($relation->order);
@@ -612,9 +614,9 @@ class ActiveRecord
         } catch (\Exception $e) {
             $previousMessage = '';
             if ($e->getPrevious()) {
-                $previousMessage = ': '.$e->getPrevious()->getMessage();
+                $previousMessage = ': ' . $e->getPrevious()->getMessage();
             }
-            throw new \Exception('SQL Error: '.$e->getMessage().$previousMessage);
+            throw new \Exception('SQL Error: ' . $e->getMessage() . $previousMessage);
         }
     }
 
@@ -623,7 +625,7 @@ class ActiveRecord
      */
     public function clearCache()
     {
-        static::cacheProvider()->deleteCache('record.'.static::tableName().'.'.$this->{static::primaryKey()});
+        static::cacheProvider()->deleteCache('record.' . static::tableName() . '.' . $this->{static::primaryKey()});
     }
 
     /**
@@ -652,7 +654,7 @@ class ActiveRecord
 
     public function clearRelationCache()
     {
-        static::cacheProvider()->deleteByMask('relation.'.static::tableName().'.'.$this->{static::primaryKey()}.'.');
+        static::cacheProvider()->deleteByMask('relation.' . static::tableName() . '.' . $this->{static::primaryKey()} . '.');
     }
 
     /**
@@ -680,10 +682,10 @@ class ActiveRecord
     }
 
     /**
-     * Setter for "has many" relation 
+     * Setter for "has many" relation
      * runs methods hasManySetterWithoutRelation or hasManySetterWithRelation
      * if object hasn't id setter stands in charge to execution after save
-     * 
+     *
      * @param string $className
      * @param array $link
      * @param array $data
@@ -703,7 +705,7 @@ class ActiveRecord
         } else {
             $this->hasManySetterWithRelation($relation, $data);
         }
-        static::cacheProvider()->deleteCache('relation.'.static::tableName().'.'.$this->{static::primaryKey()}.'.'.$relation->paramName.'.many.'.$relation->className::tableName());
+        static::cacheProvider()->deleteCache('relation.' . static::tableName() . '.' . $this->{static::primaryKey()} . '.' . $relation->paramName . '.many.' . $relation->className::tableName());
     }
 
     public function hasOneSetter(Relation $relation, $data)
@@ -811,7 +813,7 @@ class ActiveRecord
 
     /**
      * Setter for "has many" relation without relation table
-     * 
+     *
      * @param string $className
      * @param array $link
      * @param array $data
@@ -872,18 +874,18 @@ class ActiveRecord
         $newPositions = array_diff(array_column($data, $linkedTableField), array_keys($this->{$relation->paramName}));
         foreach ($newPositions as $position) {
             $columns = [$currentTableFieldInRelation => $this->{static::primaryKey()}, $linkedTableFieldInRelation => $position];
-            if($relation->order && isset($ordering[$position])) {
+            if ($relation->order && isset($ordering[$position])) {
                 $columns[static::ORDERING_FIELD] = $ordering[$position];
             }
             $tableGateway->insert($columns);
         }
         $idsToDelete = array_diff(array_keys($this->{$relation->paramName}), array_column($data, $linkedTableField));
         if (count($idsToDelete) > 0) {
-            $tableGateway->delete('`'.$currentTableFieldInRelation.'` = \''.$this->{static::primaryKey()}.'\' and `'.$linkedTableFieldInRelation.'` in(\''.implode('\',\'', $idsToDelete).'\')');
+            $tableGateway->delete('`' . $currentTableFieldInRelation . '` = \'' . $this->{static::primaryKey()} . '\' and `' . $linkedTableFieldInRelation . '` in(\'' . implode('\',\'', $idsToDelete) . '\')');
         }
         if ($relation->order) {
             $ordering = array_diff_key($ordering, array_flip($newPositions), array_flip($idsToDelete));
-            foreach($ordering as $itemId => $ordering) {
+            foreach ($ordering as $itemId => $ordering) {
                 $tableGateway->update([static::ORDERING_FIELD => $ordering], [$currentTableFieldInRelation => $this->{static::primaryKey()}, $linkedTableFieldInRelation => $itemId]);
             }
         }
@@ -925,7 +927,7 @@ class ActiveRecord
         }
         foreach (static::fieldsByType('boolean') as $field) {
             if (isset($data[$field])) {
-                $data[$field] = (boolean) $data[$field];
+                $data[$field] = (bool) $data[$field];
             }
         }
         foreach (static::fieldsByType('int') as $field) {
@@ -944,7 +946,7 @@ class ActiveRecord
             }
         }
         foreach (static::fieldsByType('boolean') as $field) {
-            $data[$field] = (integer) $data[$field];
+            $data[$field] = (int) $data[$field];
         }
         return $data;
     }
