@@ -1,8 +1,11 @@
 {
     "name": "codeit/active-record",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "type": "Utils",
     "description": "CodeIT Carcass active record plugin",
+    "license": [
+        "MIT"
+    ],
     "authors": [
         {
             "name": "CodeIt",
