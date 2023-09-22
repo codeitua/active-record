@@ -18,6 +18,7 @@ class Cache
                 $tables[] = array_values($row)[0];
             }
         }
+
         foreach ($tables as $table) {
             $cashedStructure = $cache->get('structure.'.$table);
             $cashedDefault = $cache->get('default.'.$table);
