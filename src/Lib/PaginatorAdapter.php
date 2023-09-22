@@ -3,6 +3,7 @@
 namespace CodeIT\ActiveRecord\Lib;
 
 use Zend\Db\Sql\Select;
+
 /**
  * @property \CodeIT\ActiveRecord\Model\ActiveSelect $select
   */
@@ -36,5 +37,4 @@ class PaginatorAdapter extends \Zend\Paginator\Adapter\DbSelect
         }
         return $this->rowCount;
     }
-
 }

@@ -1,12 +1,11 @@
 {
     "name": "codeit/active-record",
     "version": "1.1.9",
-    "type": "Utils",
     "description": "CodeIT Carcass active record plugin",
     "authors": [
         {
-            "name": "CodeIt",
-            "homepage": "http://codeit.com.ua"
+            "name": "CodeIT",
+            "homepage": "https://codeit.us/"
         }
     ],
     "autoload": {
@@ -15,13 +14,7 @@
         }
     },
     "require": {
-        "zendframework/zend-db": "*"
-    },
-    "repositories" : [
-        {
-            "type" : "vcs",
-            "url" : "https://gitlab.codeit.com.ua/Gerasimov/codeit.git"
-        }
-    ]
+        "zendframework/zend-db": "*",
+        "codeitua/base": "*"
+    }
 }
-
